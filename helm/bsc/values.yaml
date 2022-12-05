@@ -59,4 +59,4 @@ affinity: {}
 configName: configs 
 secretName: keystore
 passwordName: password
-consensusAddr: ""
+consensusAddr: "0x00000000000000000000"
