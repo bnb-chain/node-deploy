@@ -2,11 +2,11 @@
 
 #### Preparation
 
-1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm` is well installed.
-solc: 0.6.4
-nodejs: v12.18.3
-npm: 6.14.6
-helm: v3.9.4+
+1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm` is well installed. 
+- solc: 0.6.4 
+- nodejs: v12.18.3 
+- npm: 6.14.6 
+- helm: v3.9.4+ 
 
 2. For the first time, please execute:
 ```bash
