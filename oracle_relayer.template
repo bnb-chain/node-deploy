@@ -1,0 +1,40 @@
+{
+    "db_config": {
+      "dialect": "sqlite3",
+      "db_path": "/data/relayer.db"
+    },
+    "admin_config": {
+      "listen_addr": "0.0.0.0:8185"
+    },
+    "chain_config": {
+      "bsc_start_height": 1,
+      "bsc_provider": "http://bsc-node.bsc.svc.cluster.local:8545",
+      "bsc_cross_chain_contract_address": "0x0000000000000000000000000000000000002000",
+      "bsc_chain_id": {{bsc_chain_id}},
+      "bsc_confirm_num": 1,
+  
+      "bbc_rpc_addr": "tcp://bc-node.bc.svc.cluster.local:26657",
+      "bbc_key_type": "mnemonic",
+      "bbc_aws_region": "",
+      "bbc_aws_secret_name": "",
+      "bbc_mnemonic": {{bbc_mnemonic}},
+      "relay_interval": 500
+    },
+    "log_config": {
+      "level": "DEBUG",
+      "filename": "",
+      "max_file_size_in_mb": 0,
+      "max_backups_of_log_files": 0,
+      "max_age_to_retain_log_files_in_days": 0,
+      "use_console_logger": true,
+      "use_file_logger": false,
+      "compress": false
+    },
+    "alert_config": {
+      "moniker": "oracle-relayer",
+      "telegram_bot_id": "",
+      "telegram_chat_id": "",
+      "block_update_time_out": 60,
+      "package_delay_alert_threshold": 10
+    }
+}

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bsc.fullname" . }}
+  labels:
+    {{- include "bsc.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 8545
+      targetPort: 8545
+      protocol: TCP
+      name: http
+    - port: 30303
+      targetPort: 30303
+      protocol: TCP
+      name: tcp
+    - port: 30303
+      targetPort: 30303
+      protocol: UDP
+      name: udp
+  selector:
+    {{- include "bsc.selectorLabels" . | nindent 4 }}

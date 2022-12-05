@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "bsc.fullname" . }}
+  labels:
+    {{- include "bsc.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "bsc.selectorLabels" . | nindent 6 }}
+  serviceName: {{ include "bsc.fullname" . }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bsc.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "bsc.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: install
+          image: busybox
+          command:
+            ['sh', '-c', "mkdir -p /data/keystore && cp /data/accounts/* /data/keystore"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: secret-volume
+              mountPath: /data/accounts
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - "geth"
+            - "--config"
+            - "/data/config.toml"
+            - "--datadir"
+            - "/data"
+            - "--ws"
+            - "--ws.port"
+            - "8545"
+            - "--ws.addr"
+            - "0.0.0.0"
+            - "--http.addr"
+            - "0.0.0.0"
+            - "--http.port"
+            - "8545"
+            - "--mine"
+            - "--password"
+            - "/data/password.txt"
+            - "-unlock"
+            - "{{ .Values.consensusAddr }}"
+            - "--rpc.allow-unprotected-txs"
+            - "--gcmode"
+            - "archive"
+          ports:
+            - name: http
+              containerPort: 8545
+              protocol: TCP
+            - name: tcp
+              containerPort: 30303
+              protocol: TCP
+            - name: udp
+              containerPort: 30303
+              protocol: UDP
+          volumeMounts:
+            - name: password-volume
+              mountPath: /data/password.txt
+              subPath: password.txt
+              readOnly: true
+            - name: config-volume
+              mountPath: /data/config.toml
+              subPath: config.toml
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ .Values.configName }}
+        - name: secret-volume
+          secret:
+            secretName: {{ .Values.secretName }}
+        - name: password-volume
+          secret:
+            secretName: {{ .Values.passwordName }}
+        - name: data
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
