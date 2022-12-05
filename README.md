@@ -31,3 +31,11 @@ bash +x ./setup_oracle_relayer.sh install_k8s
 bash +x ./setup_bsc_relayer.sh docker
 bash +x ./setup_bsc_relayer.sh install_k8s
 ```
+
+#### Remove All
+```bash
+bash +x ./setup_bc_node.sh uninstall_k8s
+bash +x ./setup_bsc_node.sh uninstall_k8s
+bash +x ./setup_oracle_relayer.sh uninstall_k8s
+bash +x ./setup_bsc_relayer.sh uninstall_k8s
+```
