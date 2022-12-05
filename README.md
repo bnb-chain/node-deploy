@@ -33,7 +33,7 @@ helm install bc-node \
 --side-cons-addr "0x56cF6C1EF1315b2fE7b549c87BBe7851F14F0C44" \
 --side-fee-addr "0x43e44a05ecf8316e254b4aa1ca1c82c5ccd213b9" \
 --address-delegator "bnb1340263fqudxd69sny6adfksucmtxpmpvtg652l" \
---side-chain-id bsc \
+--side-chain-id rialto \
 --amount 10000000000000:BNB \
 --commission-rate 10000000 \
 --commission-max-rate 20000000 \
