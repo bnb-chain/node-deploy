@@ -2,7 +2,7 @@
     "cross_chain_config": {
       "source_chain_id": 1,
       "dest_chain_id": {{bsc_chain_id}},
-      "monitor_channel_list": [1, 2, 3, 8, 9, 16],
+      "monitor_channel_list": [1, 2, 3, 8, 9, 11, 16],
       "competition_mode": false
     },
     "bbc_config": {

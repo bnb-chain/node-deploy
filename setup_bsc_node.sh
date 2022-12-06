@@ -19,12 +19,12 @@ function register_validator() {
      --side-cons-addr "${cons_addr}" \
      --side-fee-addr "${fee_addr}" \
      --address-delegator "${delegator}" \
-     --side-chain-id bsc \
+     --side-chain-id ${BSC_CHAIN_NAME} \
      --amount 10000000000000:BNB \
      --commission-rate 10000000 \
      --commission-max-rate 20000000 \
      --commission-max-change-rate 5000000 \
-     --moniker "${BBC_CHAIN_ID}" \
+     --moniker "bsc-local-validator" \
      --details "${BBC_CHAIN_ID}" \
      --website "http://localhost" \
      --from ${BBC_LOCAL_USER} \

@@ -6,6 +6,9 @@ function init() {
     mkdir -p ${workspace}/.local/bc
     rm -rf ${workspace}/.local/bc/*
     ${workspace}/bin/bnbchaind init --home ./.local/bc --chain-id ${BBC_CHAIN_ID} --moniker ${BBC_LOCAL_USER} --kpass "${KEYPASS}" > ${workspace}/.local/bc/info
+
+    sed -i -e "s/bscChainId = \"bsc\"/bscChainId = \"${BSC_CHAIN_NAME}\"/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/bscIbcChainId = 2/bscIbcChainId = ${BSC_CHAIN_ID}/g" ${workspace}/.local/bc/config/app.toml
 }
 
 function prepare_k8s_config() {
