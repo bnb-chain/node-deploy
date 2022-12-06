@@ -14,7 +14,16 @@ $ git submodule update --init --recursive
 ```
 
 3. Make `geth`, `bnbchaind`, `bnbcli` binary, and put it into `bin/` folder.
+```bash
+git clone https://github.com/bnb-chain/bsc.git
+cd bsc && make geth
+cp ./build/bin/geth ../bin/geth
 
+git clone https://github.com/bnb-chain/node.git
+cd node && make build
+cp ./build/bnbcli ../bin/bnbcli
+cp ./build/bnbchaind ../bin/bnbchaind
+```
 #### Setup All
 ```
 bash +x ./setup_bc_node.sh init
