@@ -43,7 +43,7 @@ CMD=$1
 case ${CMD} in
 docker)
     echo "===== init ===="
-    init
+    prepare_docker_image
     echo "===== end ===="
     ;;
 install_k8s)
