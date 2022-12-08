@@ -6,8 +6,6 @@ function prepare_docker_image() {
     rm -rf bsc-relayer
     git clone https://github.com/bnb-chain/bsc-relayer
     cd bsc-relayer
-    go get -u golang.org/x/sys # fix compile issue
-    sed -i -e "s/FROM golang:1.13-alpine/FROM golang:1.17-alpine/g" Dockerfile
     docker build . -t bsc-relayer
 }
 
