@@ -9,6 +9,16 @@ function init() {
 
     sed -i -e "s/bscChainId = \"bsc\"/bscChainId = \"${BSC_CHAIN_NAME}\"/g" ${workspace}/.local/bc/config/app.toml
     sed -i -e "s/bscIbcChainId = 2/bscIbcChainId = ${BSC_CHAIN_ID}/g" ${workspace}/.local/bc/config/app.toml
+
+    sed -i -e "s/timeout_commit = \"1s\"/timeout_commit = \"${BBC_BLOCK_TIMEOUT}\"/g" ${workspace}/.local/bc/config/config.toml
+    
+    sed -i -e "s/BEP82Height = 9223372036854775807/BEP82Height = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/BEP84Height = 9223372036854775807/BEP84Height = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/BEP87Height = 9223372036854775807/BEP87Height = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/FixFailAckPackageHeight = 9223372036854775807/FixFailAckPackageHeight = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/EnableAccountScriptsForCrossChainTransferHeight = 9223372036854775807/EnableAccountScriptsForCrossChainTransferHeight = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/BEP128Height = 9223372036854775807/BEP128Height = 1/g" ${workspace}/.local/bc/config/app.toml
+    sed -i -e "s/BEP151Height = 9223372036854775807/BEP151Height = 1/g" ${workspace}/.local/bc/config/app.toml
 }
 
 function prepare_k8s_config() {

@@ -47,7 +47,7 @@ WSPort = 8546
 
 [Node.P2P]
 MaxPeers = 50
-NoDiscovery = false
+NoDiscovery = true
 StaticNodes = []
 TrustedNodes = []
 ListenAddr = ":30311"

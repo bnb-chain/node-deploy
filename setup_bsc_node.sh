@@ -24,8 +24,9 @@ function register_validator() {
      --commission-rate 10000000 \
      --commission-max-rate 20000000 \
      --commission-max-change-rate 5000000 \
-     --moniker "bsc-local-validator" \
-     --details "${BBC_CHAIN_ID}" \
+     --moniker "${cons_addr}" \
+     --details "${cons_addr}" \
+     --identity "${delegator}" \
      --website "http://localhost" \
      --from ${BBC_LOCAL_USER} \
      --chain-id "${BBC_CHAIN_ID}" \
@@ -95,6 +96,10 @@ function generate() {
         sed -i -e '/TerminalTotalDifficulty/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e '/BaseFee/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e '/RPCTxFeeCap/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e "s/MirrorSyncBlock = 1/MirrorSyncBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e "s/BrunoBlock = 1/BrunoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0\nMoranBlock = 0\n/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        
     done
 }
 
