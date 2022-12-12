@@ -59,3 +59,9 @@ bash +x ./setup_bsc_relayer.sh uninstall_k8s
 ## linux
 ./bin/bnbcli bridge transfer-out --amount 5000000000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
 ```
+
+#### Tools
+1. [solc-select](https://github.com/crytic/solc-select)
+2. [nvm](https://github.com/nvm-sh/nvm)
+3. [len][https://k8slens.dev/]
+4. [minikube](https://minikube.sigs.k8s.io/docs/start/)
