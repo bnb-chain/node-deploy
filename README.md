@@ -2,7 +2,7 @@
 
 #### Preparation
 
-1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm` is well installed. 
+1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm`, `jq` is well installed. 
 - solc: 0.6.4 
 - nodejs: v12.18.3 
 - npm: 6.14.6 
@@ -10,7 +10,7 @@
 
 2. For the first time, please execute:
 ```bash
-$ git submodule update --init --recursive
+git submodule update --init --recursive
 ```
 
 3. Make `geth`, `bnbchaind`, `bnbcli` binary, and put it into `bin/` folder.
@@ -31,6 +31,7 @@ bash +x ./setup_bc_node.sh install_k8s
 kubectl port-forward svc/bc-node 26657:26657 -n bc
 
 bash +x ./setup_bsc_node.sh register
+password -> 12345678
 bash +x ./setup_bsc_node.sh generate
 bash +x ./setup_bsc_node.sh install_k8s
 

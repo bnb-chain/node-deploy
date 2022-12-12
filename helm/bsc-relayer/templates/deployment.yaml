@@ -33,7 +33,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["./build/bsc-relayer", "--bbc-network-type", "0", "--config-type", "local", "--config-path", "/data/config/bsc_relayer.json"]
+          command: ["./bsc-relayer", "--bbc-network-type", "0", "--config-type", "local", "--config-path", "/data/config/bsc_relayer.json"]
           ports:
             - name: http
               containerPort: 8090
