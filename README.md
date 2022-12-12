@@ -63,5 +63,5 @@ bash +x ./setup_bsc_relayer.sh uninstall_k8s
 #### Tools
 1. [solc-select](https://github.com/crytic/solc-select)
 2. [nvm](https://github.com/nvm-sh/nvm)
-3. [len][https://k8slens.dev/]
+3. [len](https://k8slens.dev/)
 4. [minikube](https://minikube.sigs.k8s.io/docs/start/)
