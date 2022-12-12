@@ -13,7 +13,7 @@ function register_validator() {
     echo "${KEYPASS}" > ${workspace}/.local/bsc/password.txt
     cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
     fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
-    delegator=$(${workspace}/bin/bnbcli keys list | grep local | awk -F" " '{print $3}')
+    delegator=$(${workspace}/bin/bnbcli keys list | grep ${BBC_LOCAL_USER} | awk -F" " '{print $3}')
 
     ${workspace}/bin/bnbcli staking bsc-create-validator \
      --side-cons-addr "${cons_addr}" \
