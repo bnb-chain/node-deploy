@@ -43,7 +43,7 @@ function clean() {
     cd  ${workspace}/genesis
     git stash
     cd  ${workspace}
-    git submodule update --remote
+    # git submodule update --remote
     cd  ${workspace}/genesis
     npm install
 }
@@ -61,7 +61,7 @@ function prepare_config() {
      fee_addr="0x$(cat ${i} | jq -r .address)"
     done
 
-    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/System.template
+    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/RelayerHub.template
     sed -i -e "s/false/true/g" ${workspace}/genesis/generate-relayerhub.js
     sed "s/{{INIT_HOLDER_ADDR}}/${INIT_HOLDER}/g" ${workspace}/genesis/init_holders.template > ${workspace}/genesis/init_holders.js
     sed -i -e "s/Binance-Chain-Nile/${BBC_CHAIN_ID}/g" ${workspace}/genesis/generate-tendermintlightclient.js

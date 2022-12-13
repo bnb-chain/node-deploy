@@ -70,6 +70,15 @@ kubectl -n bsc port-forward po/bsc-node-0 8545:8545
 curl -X POST "http://127.0.0.1:8545" -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186", "latest"],"id":1}' 
 ```
 
+#### Propose new relayer
+```bash
+prpopose could be used only after block number 100 on BC
+./propose_relayer.sh propose
+vote needs to be cast within 100s
+./propose_relayer.sh vote
+./propose_relayer.sh query
+```
+
 #### Tools
 1. [solc-select](https://github.com/crytic/solc-select)
 2. [nvm](https://github.com/nvm-sh/nvm)

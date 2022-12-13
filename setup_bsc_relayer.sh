@@ -4,7 +4,7 @@ workspace=${basedir}
 
 function prepare_docker_image() {
     rm -rf bsc-relayer
-    git clone https://github.com/bnb-chain/bsc-relayer
+    git clone -b bep-174-changes https://github.com/bnb-chain/bsc-relayer
     cd bsc-relayer
     docker build . -t bsc-relayer
 }
