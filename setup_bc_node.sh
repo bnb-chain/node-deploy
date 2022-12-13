@@ -12,6 +12,7 @@ function init() {
 
     sed -i -e "s/timeout_commit = \"1s\"/timeout_commit = \"${BBC_BLOCK_TIMEOUT}\"/g" ${workspace}/.local/bc/config/config.toml
     
+    sed -i -e "s/breatheBlockInterval = 0/breatheBlockInterval = 100/g" ${workspace}/.local/bc/config/app.toml
     sed -i -e "s/BEP82Height = 9223372036854775807/BEP82Height = 1/g" ${workspace}/.local/bc/config/app.toml
     sed -i -e "s/BEP84Height = 9223372036854775807/BEP84Height = 1/g" ${workspace}/.local/bc/config/app.toml
     sed -i -e "s/BEP87Height = 9223372036854775807/BEP87Height = 1/g" ${workspace}/.local/bc/config/app.toml
