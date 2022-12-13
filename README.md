@@ -60,6 +60,16 @@ bash +x ./setup_bsc_relayer.sh uninstall_k8s
 ./bin/bnbcli bridge transfer-out --amount 5000000000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
 ```
 
+2. Enable port forwarding
+```
+kubectl -n bsc port-forward po/bsc-node-0 8545:8545
+```
+
+3. Check the balance 
+```
+curl -X POST "http://127.0.0.1:8545" -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186", "latest"],"id":1}' 
+```
+
 #### Tools
 1. [solc-select](https://github.com/crytic/solc-select)
 2. [nvm](https://github.com/nvm-sh/nvm)
