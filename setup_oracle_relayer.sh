@@ -6,8 +6,6 @@ function prepare_docker_image() {
     rm -rf oracle-relayer
     git clone https://github.com/bnb-chain/oracle-relayer
     cd oracle-relayer
-    go get -u golang.org/x/sys # fix compile issue
-    sed -i -e "s/FROM golang:1.13-alpine/FROM golang:1.17-alpine/g" Dockerfile
     make build_docker
 }
 
