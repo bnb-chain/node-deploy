@@ -43,7 +43,7 @@ function clean() {
     cd  ${workspace}/genesis
     git stash
     cd  ${workspace}
-    # git submodule update --remote
+    git submodule update
     cd  ${workspace}/genesis
     npm install
 }
