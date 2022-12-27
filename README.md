@@ -61,10 +61,10 @@ bash +x ./setup_bsc_relayer.sh uninstall_k8s
 1. send bnb from bc to bsc
 ```bash
 ## macos
-./bin/bnbcli bridge transfer-out --amount 5000000000000:BNB --expire-time $(date -v+300S +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
+./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-time $(date -v+300S +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
 
 ## linux
-./bin/bnbcli bridge transfer-out --amount 5000000000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
+./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
 ```
 
 2. Enable port forwarding
