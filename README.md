@@ -2,11 +2,12 @@
 
 #### Preparation
 
-1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm`, `jq` is well installed. 
+1. Make sure `git`,`solc`, `nodejs`, `npm`, `helm`, `jq`, `go` is well installed. 
 - solc: 0.6.4 
 - nodejs: v12.18.3 
 - npm: 6.14.6 
 - helm: v3.9.4+ 
+- go: 1.18
 
 2. For the first time, please execute:
 ```bash
@@ -24,6 +25,12 @@ cd node && make build
 cp ./build/bnbcli ../bin/bnbcli
 cp ./build/bnbchaind ../bin/bnbchaind
 ```
+
+4. Make `tool` binary
+```bash
+make tool
+```
+
 #### Setup All
 ```
 bash +x ./setup_bc_node.sh init

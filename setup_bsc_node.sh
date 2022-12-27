@@ -4,7 +4,7 @@ workspace=${basedir}
 size=1
 nodeurl="http://localhost:26657"
 replaceWhitelabelRelayer="0xb005741528b86F5952469d80A8614591E3c5B632"
-initConsensusStateBytes=$(${workspace}/bin/getInitConsensusState --height 1 --rpc ${nodeurl} --network-type testnet | awk -F"  " '{print $2}')
+initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
 replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 
 function register_validator() {
@@ -69,8 +69,11 @@ function prepare_config() {
     
     for ((i=0;i<${size};i++));do
         mkdir -p ${workspace}/clusterNetwork/node${i}
+        
+        bbcfee_addrs=`${workspace}/bin/bnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -addr`
+        powers=`${workspace}/bin/bnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq ".[${i}].tokens" |xargs ${workspace}/bin/tool -power`
 
-        echo "${cons_addr},${fee_addr},${fee_addr},0x0000000010000000" >> ${workspace}/genesis/validators.conf
+        echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers}" >> ${workspace}/genesis/validators.conf
         echo "validator" ${i} ":" ${cons_addr}
         echo "validatorFee" ${i} ":" ${fee_addr}
     done
