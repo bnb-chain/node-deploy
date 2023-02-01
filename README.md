@@ -57,6 +57,12 @@ bash +x ./setup_oracle_relayer.sh uninstall_k8s
 bash +x ./setup_bsc_relayer.sh uninstall_k8s
 ```
 
+#### Upgrade Image
+```bash
+kubectl set image statefulset/bc-node bc=ghcr.io/bnb-chain/node:0.10.6 -n bc
+kubectl set image statefulset/bsc-node bsc=ghcr.io/bnb-chain/bsc:1.1.18_hf -n bsc
+```
+
 #### Cross Chain Tx
 1. send bnb from bc to bsc
 ```bash

@@ -105,7 +105,12 @@ spec:
           secret:
             secretName: {{ .Values.passwordName }}
         - name: data
+          {{ if .Values.persistHost }}
+          hostPath:
+            path: {{ .Values.persistHost }}
+          {{ else }}
           emptyDir: {}
+          {{ end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

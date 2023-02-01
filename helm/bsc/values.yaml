@@ -23,8 +23,9 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext: 
+  allowPrivilegeEscalation: false
+  runAsUser: 0
 
 securityContext: {}
   # capabilities:
@@ -55,6 +56,8 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# persistHost: /tmp/data/bsc
 
 configName: configs 
 secretName: keystore
