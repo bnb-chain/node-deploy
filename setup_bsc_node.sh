@@ -126,14 +126,9 @@ function prepare_k8s_config() {
 function install_k8s() {
     mkdir -p ${workspace}/.local/bsc
     rm -rf ${workspace}/.local/bsc/values.yaml
-    cp ${workspace}/helm/bsc/values.yaml ${workspace}/.local/bsc/values.yaml
-    for i in ${workspace}/.local/bsc/validator/keystore/*;do
-     cons_addr="0x$(cat ${i} | jq -r .address)"
-    done
-    sed -i -e "s/0x00000000000000000000/${cons_addr}/g" ${workspace}/.local/bsc/values.yaml
     helm install bsc-node \
-    --namespace bsc --create-namespace -f ${workspace}/.local/bsc/values.yaml \
-    ${workspace}/helm/bsc
+    --namespace bsc --create-namespace \
+    ${workspace}/helm/bsc 
 }
 
 function uninstall_k8s() {

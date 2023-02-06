@@ -28,8 +28,10 @@ spec:
       initContainers:
         - name: install
           image: busybox
-          command:
-            ['sh', '-c', "mkdir -p /data/keystore && cp /data/accounts/* /data/keystore"]
+          command: ["/bin/sh", "-c"]
+          args:
+            - mkdir -p /data/keystore;
+              cp /data/accounts/* /data/keystore/
           volumeMounts:
             - name: data
               mountPath: /data
@@ -41,29 +43,21 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - "geth"
-            - "--config"
-            - "/data/config.toml"
-            - "--datadir"
-            - "/data"
-            - "--ws"
-            - "--ws.port"
-            - "8545"
-            - "--ws.addr"
-            - "0.0.0.0"
-            - "--http.addr"
-            - "0.0.0.0"
-            - "--http.port"
-            - "8545"
-            - "--mine"
-            - "--password"
-            - "/data/password.txt"
-            - "-unlock"
-            - "{{ .Values.consensusAddr }}"
-            - "--rpc.allow-unprotected-txs"
-            - "--gcmode"
-            - "archive"
+          command: ["/bin/sh", "-c"]
+          args: 
+            - geth
+              --config /data/config.toml
+              --datadir /data
+              --ws
+              --ws.port 8545
+              --ws.addr 0.0.0.0
+              --http.addr 0.0.0.0
+              --http.port 8545
+              --mine
+              --password /data/password.txt
+              -unlock "0x$(cat /data/keystore/* | sed -n 's/.*"address":"\([^"]*\).*/\1/p')"
+              --rpc.allow-unprotected-txs
+              --gcmode archive
           ports:
             - name: http
               containerPort: 8545
