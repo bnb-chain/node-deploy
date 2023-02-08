@@ -33,7 +33,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["./relayer", "--bbc-network", "0", "--config-type", "local", "--config-path", "/data/config/oracle_relayer.json"]
+          command: ["./relayer", "--bbc-network", "1", "--config-type", "local", "--config-path", "/data/config/oracle_relayer.json"]
           ports:
             - name: http
               containerPort: 8185

@@ -11,12 +11,12 @@ spec:
       targetPort: 8545
       protocol: TCP
       name: http
-    - port: 30303
-      targetPort: 30303
+    - port: 30311
+      targetPort: 30311
       protocol: TCP
       name: tcp
-    - port: 30303
-      targetPort: 30303
+    - port: 30311
+      targetPort: 30311
       protocol: UDP
       name: udp
   selector:

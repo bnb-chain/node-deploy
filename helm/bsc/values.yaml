@@ -23,11 +23,11 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: 
-  allowPrivilegeEscalation: false
+podSecurityContext: {}
+  
+securityContext: 
+  privileged: true
   runAsUser: 0
-
-securityContext: {}
   # capabilities:
   #   drop:
   #   - ALL
@@ -62,3 +62,4 @@ affinity: {}
 configName: configs 
 secretName: keystore
 passwordName: password
+nodeKeyCfgName: nodekey

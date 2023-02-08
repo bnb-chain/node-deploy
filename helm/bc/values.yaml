@@ -23,11 +23,11 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: 
-  allowPrivilegeEscalation: false
-  runAsUser: 0
+podSecurityContext: {}
 
-securityContext: {}
+securityContext: 
+  privileged: true
+  runAsUser: 0
   # capabilities:
   #   drop:
   #   - ALL

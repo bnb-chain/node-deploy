@@ -7,7 +7,7 @@
     },
     "bbc_config": {
       "rpc_addrs": [
-        "tcp://bc-node.bc.svc.cluster.local:26657"
+        "tcp://bc-node-0.bc.svc.cluster.local:26657"
       ],
       "mnemonic_type": "local_mnemonic",
       "aws_region": "",
@@ -24,7 +24,7 @@
     "aws_secret_name": "",
     "private_key": "{{private_key}}",
     "providers": [
-      "http://bsc-node.bsc.svc.cluster.local:8545"
+      "http://bsc-node-0.bsc.svc.cluster.local:8545"
     ],
     "gas_limit": 4700000,
     "gas_price": 50000000000,

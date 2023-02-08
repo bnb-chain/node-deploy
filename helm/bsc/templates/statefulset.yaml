@@ -53,20 +53,24 @@ spec:
               --ws.addr 0.0.0.0
               --http.addr 0.0.0.0
               --http.port 8545
+              --http.corsdomain "*"
+              --allow-insecure-unlock
               --mine
               --password /data/password.txt
               -unlock "0x$(cat /data/keystore/* | sed -n 's/.*"address":"\([^"]*\).*/\1/p')"
               --rpc.allow-unprotected-txs
               --gcmode archive
+              --syncmode=full
+              --nodekey /data/nodekey
           ports:
             - name: http
               containerPort: 8545
               protocol: TCP
             - name: tcp
-              containerPort: 30303
+              containerPort: 30311
               protocol: TCP
             - name: udp
-              containerPort: 30303
+              containerPort: 30311
               protocol: UDP
           volumeMounts:
             - name: password-volume
@@ -76,6 +80,9 @@ spec:
             - name: config-volume
               mountPath: /data/config.toml
               subPath: config.toml
+            - name: nodekey-volume
+              mountPath: /data/nodekey
+              subPath: nodekey
             - name: data
               mountPath: /data
           livenessProbe:
@@ -92,6 +99,9 @@ spec:
         - name: config-volume
           configMap:
             name: {{ .Values.configName }}
+        - name: nodekey-volume
+          configMap:
+            name: {{ .Values.nodeKeyCfgName }}
         - name: secret-volume
           secret:
             secretName: {{ .Values.secretName }}

@@ -15,7 +15,7 @@ function prepare_k8s_config() {
     cp oracle_relayer.template ${workspace}/.local/relayer/oracle_relayer.json
 
     sed -i -e "s/{{bsc_chain_id}}/${BSC_CHAIN_ID}/g" ${workspace}/.local/relayer/oracle_relayer.json
-    mnemonic=$(cat ${workspace}/.local/bc/info | jq .app_message.secret)
+    mnemonic=$(cat ${workspace}/.local/bc/node0/node.info | jq .app_message.secret)
     sed -i -e "s/{{bbc_mnemonic}}/${mnemonic}/g" ${workspace}/.local/relayer/oracle_relayer.json
 
     kubectl create ns relayer

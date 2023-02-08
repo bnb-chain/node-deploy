@@ -8,12 +8,12 @@
     },
     "chain_config": {
       "bsc_start_height": 1,
-      "bsc_providers": ["http://bsc-node.bsc.svc.cluster.local:8545"],
+      "bsc_providers": ["http://bsc-node-0.bsc.svc.cluster.local:8545"],
       "bsc_cross_chain_contract_address": "0x0000000000000000000000000000000000002000",
       "bsc_chain_id": {{bsc_chain_id}},
       "bsc_confirm_num": 1,
   
-      "bbc_rpc_addrs": ["tcp://bc-node.bc.svc.cluster.local:26657"],
+      "bbc_rpc_addrs": ["tcp://bc-node-0.bc.svc.cluster.local:26657"],
       "bbc_key_type": "mnemonic",
       "bbc_aws_region": "",
       "bbc_aws_secret_name": "",

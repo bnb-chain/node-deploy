@@ -10,7 +10,7 @@ function prepare_docker_image() {
 }
 
 function prepare_k8s_config() {
-    mnemonic=$(cat ${workspace}/.local/bc/info | jq .app_message.secret)
+    mnemonic=$(cat ${workspace}/.local/bc/node0/node.info | jq .app_message.secret)
 
     mkdir -p ${workspace}/.local/relayer/
     rm -rf ${workspace}/.local/relayer/bsc_relayer.*
