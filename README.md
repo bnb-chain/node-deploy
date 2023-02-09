@@ -71,7 +71,7 @@ echo "12345678" | ./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-t
 
 7. Enable port forwarding
 ```
-kubectl -n bsc port-forward po/bsc-node-0 8545:8545
+kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 ```
 
 8. Check the account balance
