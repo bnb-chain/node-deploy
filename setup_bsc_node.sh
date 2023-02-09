@@ -92,7 +92,6 @@ function prepare_config() {
     sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/System.template
     sed -i -e "s/false/true/g" ${workspace}/genesis/generate-relayerhub.js
     sed "s/{{INIT_HOLDER_ADDR}}/${INIT_HOLDER}/g" ${workspace}/genesis/init_holders.template > ${workspace}/genesis/init_holders.js
-    sed -i -e "s/Binance-Chain-Nile/${BBC_CHAIN_ID}/g" ${workspace}/genesis/generate-tendermintlightclient.js
     sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" ${workspace}/genesis/generate-tendermintlightclient.js
     
     for ((i=0;i<${size};i++));do
@@ -116,8 +115,7 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     node generate-validator.js
-    node generate-genesis.js
-    sed -i -e "s/\"chainId\": 714/\"chainId\": ${BSC_CHAIN_ID}/g" ${workspace}/genesis/genesis.json
+    node generate-genesis.js --chainid ${BSC_CHAIN_ID} --bscChainId "$(printf '%04x\n' ${BSC_CHAIN_ID})"
 }
 
 function generate() {
