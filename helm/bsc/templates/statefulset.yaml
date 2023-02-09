@@ -9,6 +9,10 @@ spec:
     matchLabels:
       {{- include "bsc.selectorLabels" . | nindent 6 }}
   serviceName: {{ include "bsc.fullname" . }}
+  {{ if .Values.volumeClaimTemplates }}
+  volumeClaimTemplates:
+    {{- toYaml .Values.volumeClaimTemplates | nindent 4 }}
+  {{ end }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -109,9 +113,7 @@ spec:
           secret:
             secretName: {{ .Values.passwordName }}
         - name: data
-          {{ if .Values.persistHost }}
-          hostPath:
-            path: {{ .Values.persistHost }}
+          {{ if .Values.volumeClaimTemplates }}
           {{ else }}
           emptyDir: {}
           {{ end }}

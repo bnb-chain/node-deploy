@@ -57,7 +57,15 @@ tolerations: []
 
 affinity: {}
 
-# persistHost: /tmp/data/bsc
+volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: 
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
 
 configName: configs 
 secretName: keystore
