@@ -43,7 +43,12 @@ cp ./build/bnbchaind ../bin/bnbchaind
 make tool
 ```
 
-5. Setup all nodes on k8s environment
+5. Start local Kubernetes cluster
+```bash
+minikube start
+```
+
+6. Setup all nodes on k8s environment
 ```bash
 bash +x ./setup_bc_node.sh init
 bash +x ./setup_bc_node.sh install_k8s
@@ -60,7 +65,7 @@ bash +x ./setup_bsc_relayer.sh docker
 bash +x ./setup_bsc_relayer.sh install_k8s
 ```
 
-6. Execute cross chain transaction by sending BNB from BC to BSC
+7. Execute cross chain transaction by sending BNB from BC to BSC
 ```bash
 ## macos
 echo "12345678" | ./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-time $(date -v+300S +%s) --to 0x96D904C0e47e6477C4416369a9858f6E57B317eC  --from node0-delegator --chain-id Binance-Chain-Nile --node localhost:26657 --home ./.local/bc/node0
@@ -69,12 +74,12 @@ echo "12345678" | ./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-t
 echo "12345678" | ./bin/bnbcli bridge transfer-out --amount 50000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x96D904C0e47e6477C4416369a9858f6E57B317eC  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
 ```
 
-7. Enable port forwarding
+8. Enable port forwarding
 ```
 kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 ```
 
-8. Check the account balance
+9. Check the account balance
 ```
 curl -X POST "http://127.0.0.1:8545" -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x96D904C0e47e6477C4416369a9858f6E57B317eC", "latest"],"id":1}' 
 ```
