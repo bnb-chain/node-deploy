@@ -3,13 +3,14 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
-size=$((${CLUSTER_SIZE}))
+size=$((${BSC_CLUSTER_SIZE}))
 nodeurl="http://localhost:26657"
 replaceWhitelabelRelayer="0xb005741528b86F5952469d80A8614591E3c5B632"
 initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 1)
 replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 
 function register_validator() {
+    sleep 5 #wait for bc setup, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc
 
     for ((i=0;i<${size};i++));do
@@ -18,11 +19,20 @@ function register_validator() {
         
         cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
-        delegator=$(${workspace}/bin/bnbcli keys list --home ${workspace}/.local/bc/node${i} | grep node${i}-delegator | awk -F" " '{print $3}')
-        
-        if [ "$i" != "0" ]; then
-            echo "${KEYPASS}" | ${workspace}/bin/bnbcli send --from node0-delegator --to $delegator --amount 2000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
+        node_dir_index=${i}
+        if [ $i -ge ${BBC_CLUSTER_SIZE} ]; then
+            # echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys delete node${i}-delegator --home ${workspace}/.local/bc/node0 # for re-entry
+            echo "${KEYPASS}" | (echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node0)
+            node_dir_index=0
         fi
+        delegator=$(${workspace}/bin/bnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
+        if [ "$i" != "0" ]; then
+            sleep 6 #wait for including tx in block
+            echo "${KEYPASS}" | ${workspace}/bin/bnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
+        fi
+        sleep 6 #wait for including tx in block
+        echo ${delegator} "balance"
+        ${workspace}/bin/bnbcli account ${delegator}  --chain-id=Binance-Chain-Nile --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
         echo "${KEYPASS}" | ${workspace}/bin/bnbcli staking bsc-create-validator \
             --side-cons-addr "${cons_addr}" \
             --side-fee-addr "${fee_addr}" \
@@ -38,7 +48,7 @@ function register_validator() {
             --from node${i}-delegator \
             --chain-id "${BBC_CHAIN_ID}" \
             --node ${nodeurl} \
-            --home ${workspace}/.local/bc/node${i}
+            --home ${workspace}/.local/bc/node${node_dir_index}
     done
 }
 
@@ -120,7 +130,7 @@ function prepare_config() {
 
 function generate() {
     cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=3 --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     for ((i=0;i<${size};i++));do
         staticPeers=$(generate_static_peers ${size} ${i})
         line=`grep -n -e 'StaticNodes' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml | cut -d : -f 1`
@@ -145,7 +155,7 @@ function generate() {
         sed -i -e '/RPCTxFeeCap/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/MirrorSyncBlock = 1/MirrorSyncBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/BrunoBlock = 1/BrunoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0\nMoranBlock = 0\n/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0\nMoranBlock = 0\nGibbsBlock = 0\n/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         
     done
 }
@@ -194,7 +204,7 @@ function uninstall_k8s() {
 CMD=$1
 case ${CMD} in
 register)
-    echo "===== clean ===="
+    echo "===== register ===="
     register_validator
     echo "===== end ===="
     ;;
