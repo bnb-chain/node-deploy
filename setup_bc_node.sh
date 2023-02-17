@@ -3,7 +3,12 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
-size=$((${CLUSTER_SIZE}))
+size=$((${BBC_CLUSTER_SIZE}))
+
+function exit_previous() {
+	# stop client
+    ps -ef  | grep bnbchaind | grep start |awk '{print $2}' | xargs kill
+}
 
 function init() {
     rm -rf ${workspace}/.local/bc/*
@@ -147,7 +152,27 @@ uninstall_k8s)
     uninstall_k8s
     echo "===== end ===="
     ;;
+native_start) #only start node0!
+    if [ ${BBC_CLUSTER_SIZE} -ne 1 ];then
+        echo "native_start only support one node, please re-init with BBC_CLUSTER_SIZE=1"
+        exit
+    fi
+    echo "===== stop native node0===="
+    exit_previous
+    sleep 5
+    echo "===== stop native node0 end ===="
+
+    echo "===== start native node0 ===="
+    nohup ${workspace}/bin/bnbchaind start --home ${workspace}/.local/bc/node0 >> ${workspace}/.local/bc/node0/bc.log 2>&1 &
+    echo "===== start native node0 end ===="
+    ;;
+native_stop)
+    echo "===== stop native node0===="
+    exit_previous
+    sleep 5
+    echo "===== stop native node0 end ===="
+    ;;
 *)
-    echo "Usage: setup_bc_node.sh init | install_k8s | uninstall_k8s"
+    echo "Usage: setup_bc_node.sh init | install_k8s | uninstall_k8s ｜ native_start | native_stop"
     ;;
 esac

@@ -4,13 +4,20 @@ workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
+native_need_bls=false
 nodeurl="http://localhost:26657"
 replaceWhitelabelRelayer="0xb005741528b86F5952469d80A8614591E3c5B632"
 initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 1)
 replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 
+function exit_previous() {
+	# stop client
+    ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
+}
+
+# need a clean bc without stakings
 function register_validator() {
-    sleep 5 #wait for bc setup, otherwise may node-delegator not inclued in state
+    sleep 10 #wait for bc setup, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc
 
     for ((i=0;i<${size};i++));do
@@ -128,6 +135,25 @@ function prepare_config() {
     node generate-genesis.js --chainid ${BSC_CHAIN_ID} --bscChainId "$(printf '%04x\n' ${BSC_CHAIN_ID})"
 }
 
+function prepareBLSWallet(){
+    echo "123456" > ${workspace}/.local/bsc/blspassword.txt
+    for ((i=0;i<${size};i++));do
+        sed -i.bak  '/BLSPasswordFile/d'  ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml #for re-entry
+        sed -i.bak '/BLSWalletDir/d'  ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml  #for re-entry
+        if [ "${native_need_bls}" = true ] ; then
+            if [ ! -d "${workspace}/.local/bsc/clusterNetwork/node${i}/bls" ]; then
+                expect create_bls_key.sh ${workspace}/.local/bsc/clusterNetwork/node${i}
+            fi
+            sed -i.bak 's/DataDir/BLSPasswordFile = \"{{BLSPasswordFile}}\"\nBLSWalletDir = \"{{BLSWalletDir}}\"\nDataDir/g'   ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+
+            PassWordPath="${workspace}/.local/bsc/blspassword.txt"
+            sed -i.bak "s:{{BLSPasswordFile}}:${PassWordPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+            WalletPath="${workspace}/.local/bsc/clusterNetwork/node${i}/bls/wallet"
+            sed -i.bak "s:{{BLSWalletDir}}:${WalletPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        fi
+    done
+}
+
 function generate() {
     cd ${workspace}
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
@@ -201,6 +227,39 @@ function uninstall_k8s() {
     done
 }
 
+function native_start() {
+    prepareBLSWallet
+
+    for ((i=0;i<${size};i++));do
+        cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
+        for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
+            cons_addr="0x$(cat ${j} | jq -r .address)"
+        done
+
+        # sorry for magic
+        for ((k=0;k<${size};k++));do
+            p2p_port_k=$((30311 + k))
+            if [ ${k} -ne ${i} ];then
+                sed -i.bak "s/bsc-node-${k}.bsc.svc.cluster.local:30311/127.0.0.1:${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+            else
+                sed -i.bak "s/\":30311/\":${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+            fi
+        done
+        HTTPPort=$((8545 + i))
+        WSPort=${HTTPPort}
+
+        nohup  ${workspace}/bin/geth --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+                            --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
+                            --password ${workspace}/.local/bsc/password.txt \
+                            --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
+                            -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+                            --metrics --metrics.addr 127.0.0.1 --metrics.expensive \
+                            --gcmode archive --syncmode=full --mine \
+                            > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+    done
+}
+
 CMD=$1
 case ${CMD} in
 register)
@@ -227,7 +286,23 @@ uninstall_k8s)
     uninstall_k8s
     echo "===== end ===="
     ;;
+native_start) # can re-entry
+    echo "===== stop native ===="
+    exit_previous
+    sleep 10
+    echo "===== stop native end ===="
+
+    echo "===== start native ===="
+    native_start
+    echo "===== start native end ===="
+    ;;
+native_stop)
+    echo "===== stop native ===="
+    exit_previous
+    sleep 5
+    echo "===== stop native end ===="
+    ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | install_k8s | uninstall_k8s"
+    echo "Usage: setup_bsc_node.sh register | generate | install_k8s | uninstall_k8s | native_start | native_stop"
     ;;
 esac

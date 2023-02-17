@@ -11,6 +11,7 @@ Before proceeding to the next steps, please ensure that the following packages a
 - minikube: 1.29.0
 - docker: 20.10.22
 - kubectl: 1.26.1
+- expect
 
 ## Quick Start
 1. Clone this repository
@@ -101,4 +102,35 @@ kubectl set image statefulset/bc-node-0 bc=ghcr.io/bnb-chain/node:0.10.6 -n bc
 
 kubectl set image statefulset/bsc-node-0 bsc=ghcr.io/bnb-chain/bsc:1.1.18_hf -n bsc
 ...
+```
+
+#### Native deploy for bc and bsc
+1. set providers addr in oracle_relayer.template and oracle_relayer.template
+```bash
+    bc-node.bc.svc.cluster.local    --> your local ip, sunch as 192.168.0.100
+    bsc-node.bsc.svc.cluster.local  --> your local ip, sunch as 192.168.0.100
+```
+
+2. Similar to process in Quick Start, difference as following
+```bash
+    bash +x ./setup_bc_node.sh init // support only one node
+    bash +x ./setup_bc_node.sh native_start // can re-entry
+
+    bash +x ./setup_bsc_node.sh register
+    bash +x ./setup_bsc_node.sh generate
+    bash +x ./setup_bsc_node.sh native_start // can re-entry
+
+    bash +x ./setup_oracle_relayer.sh docker
+    bash +x ./setup_oracle_relayer.sh install_k8s
+
+    bash +x ./setup_bsc_relayer.sh docker
+    bash +x ./setup_bsc_relayer.sh install_k8s
+```
+
+3. stop nodes
+```bash
+    bash +x ./setup_bc_node.sh native_stop 
+    bash +x ./setup_bsc_node.sh native_stop
+    bash +x ./setup_oracle_relayer.sh uninstall_k8s
+    bash +x ./setup_bsc_relayer.sh uninstall_k8s
 ```
