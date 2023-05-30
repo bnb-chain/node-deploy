@@ -1,11 +1,11 @@
 #!/usr/bin/expect
 # 6 num wanted
-set wallet_password 123456 
+set wallet_password 12345678 
 # 10 characters at least wanted
 set account_password 1234567890
 
 set timeout 5
-spawn ./bin/geth-ff bls account new --datadir [lindex $argv 0]
+spawn ./bin/geth bls account new --datadir [lindex $argv 0]
 expect "*assword:*"
 send "$wallet_password\r"
 expect "*assword:*"

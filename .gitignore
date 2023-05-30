@@ -5,6 +5,6 @@
 /bsc-relayer/
 /bin/geth
 /bin/bnbchaind
-/bin/bnbcli
+/bin/tbnbcli
 /bin/tool
 /bin/bootnode

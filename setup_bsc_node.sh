@@ -4,10 +4,8 @@ workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
-native_need_bls=false
 nodeurl="http://localhost:26657"
 replaceWhitelabelRelayer="0xb005741528b86F5952469d80A8614591E3c5B632"
-initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 1)
 replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 
 function exit_previous() {
@@ -28,20 +26,24 @@ function register_validator() {
         fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         node_dir_index=${i}
         if [ $i -ge ${BBC_CLUSTER_SIZE} ]; then
-            # echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys delete node${i}-delegator --home ${workspace}/.local/bc/node0 # for re-entry
-            echo "${KEYPASS}" | (echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node0)
+            # echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys delete node${i}-delegator --home ${workspace}/.local/bc/node0 # for re-entry
+            echo "${KEYPASS}" | (echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node0)
             node_dir_index=0
         fi
-        delegator=$(${workspace}/bin/bnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
+        delegator=$(${workspace}/bin/tbnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
         if [ "$i" != "0" ]; then
             sleep 6 #wait for including tx in block
-            echo "${KEYPASS}" | ${workspace}/bin/bnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
+            echo "${KEYPASS}" | ${workspace}/bin/tbnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
         fi
+        mkdir -p ${workspace}/.local/bsc/bls${i}
+        expect create_bls_key.sh ${workspace}/.local/bsc/bls${i}
+        vote_addr=0x$(cat ${workspace}/.local/bsc/bls${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
         sleep 6 #wait for including tx in block
         echo ${delegator} "balance"
-        ${workspace}/bin/bnbcli account ${delegator}  --chain-id=Binance-Chain-Nile --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
-        echo "${KEYPASS}" | ${workspace}/bin/bnbcli staking bsc-create-validator \
+        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id=Binance-Chain-Nile --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
             --side-cons-addr "${cons_addr}" \
+            --side-vote-addr "${vote_addr}" \
             --side-fee-addr "${fee_addr}" \
             --address-delegator "${delegator}" \
             --side-chain-id ${BSC_CHAIN_NAME} \
@@ -106,9 +108,14 @@ function prepare_config() {
     rm -f ${workspace}/genesis/init_holders.template
     cp ${workspace}/init_holders.template ${workspace}/genesis/init_holders.template
 
-    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/System.template
+    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/RelayerHub.template
+    sed -i -e "s/function whitelistInit() external/function whitelistInit() public/g" ${workspace}/genesis/contracts/RelayerHub.template
+    sed -i -e "s/alreadyInit = true;/whitelistInit();\nalreadyInit = true;/g" ${workspace}/genesis/contracts/RelayerHub.template
+    sed -i -e "s/alreadyInit = true;/enableMaliciousVoteSlash = true;\nalreadyInit = true;/g" ${workspace}/genesis/contracts/SlashIndicator.template
+    sed -i -e "s/numOperator = 2;/operators[VALIDATOR_CONTRACT_ADDR] = true;\noperators[SLASH_CONTRACT_ADDR] = true;\nnumOperator = 4;/g" ${workspace}/genesis/contracts/SystemReward.template
     sed -i -e "s/false/true/g" ${workspace}/genesis/generate-relayerhub.js
     sed "s/{{INIT_HOLDER_ADDR}}/${INIT_HOLDER}/g" ${workspace}/genesis/init_holders.template > ${workspace}/genesis/init_holders.js
+    initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
     sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" ${workspace}/genesis/generate-tendermintlightclient.js
     
     for ((i=0;i<${size};i++));do
@@ -122,36 +129,22 @@ function prepare_config() {
         
         mkdir -p ${workspace}/.local/bsc/clusterNetwork/node${i}
         
-        bbcfee_addrs=`${workspace}/bin/bnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -addr`
-        powers=`${workspace}/bin/bnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -power`
+        bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
+        powers=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
         
-        echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers}" >> ${workspace}/genesis/validators.conf
+        mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
+        vote_addr=0x$(cat ${workspace}/.local/bsc/clusterNetwork/node${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
+        echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
         echo "validator" ${i} ":" ${cons_addr}
         echo "validatorFee" ${i} ":" ${fee_addr}
+
+
     done
 
     cd ${workspace}/genesis/
+    # sed -i -e "s/\"0x\" + publicKey.pop()/vs[4]/" generate-validator.js
     node generate-validator.js
     node generate-genesis.js --chainid ${BSC_CHAIN_ID} --bscChainId "$(printf '%04x\n' ${BSC_CHAIN_ID})"
-}
-
-function prepareBLSWallet(){
-    echo "123456" > ${workspace}/.local/bsc/blspassword.txt
-    for ((i=0;i<${size};i++));do
-        sed -i.bak  '/BLSPasswordFile/d'  ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml #for re-entry
-        sed -i.bak '/BLSWalletDir/d'  ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml  #for re-entry
-        if [ "${native_need_bls}" = true ] ; then
-            if [ ! -d "${workspace}/.local/bsc/clusterNetwork/node${i}/bls" ]; then
-                expect create_bls_key.sh ${workspace}/.local/bsc/clusterNetwork/node${i}
-            fi
-            sed -i.bak 's/DataDir/BLSPasswordFile = \"{{BLSPasswordFile}}\"\nBLSWalletDir = \"{{BLSWalletDir}}\"\nDataDir/g'   ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-
-            PassWordPath="${workspace}/.local/bsc/blspassword.txt"
-            sed -i.bak "s:{{BLSPasswordFile}}:${PassWordPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-            WalletPath="${workspace}/.local/bsc/clusterNetwork/node${i}/bls/wallet"
-            sed -i.bak "s:{{BLSWalletDir}}:${WalletPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        fi
-    done
 }
 
 function generate() {
@@ -181,7 +174,10 @@ function generate() {
         sed -i -e '/RPCTxFeeCap/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/MirrorSyncBlock = 1/MirrorSyncBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/BrunoBlock = 1/BrunoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0\nMoranBlock = 0\nGibbsBlock = 0\n/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        sed -i -e 's/DataDir/BLSPasswordFile = \"{{BLSPasswordFile}}\"\nDataDir/g' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+        PassWordPath="${workspace}/.local/bsc/password.txt"
+        sed -i -e "s:{{BLSPasswordFile}}:${PassWordPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         
     done
 }
@@ -228,8 +224,6 @@ function uninstall_k8s() {
 }
 
 function native_start() {
-    prepareBLSWallet
-
     for ((i=0;i<${size};i++));do
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
@@ -240,22 +234,24 @@ function native_start() {
         for ((k=0;k<${size};k++));do
             p2p_port_k=$((30311 + k))
             if [ ${k} -ne ${i} ];then
-                sed -i.bak "s/bsc-node-${k}.bsc.svc.cluster.local:30311/127.0.0.1:${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+                sed -i.bak "s/bsc-node-${k}.bsc.svc.cluster.local:30311/localhost:${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
             else
                 sed -i.bak "s/\":30311/\":${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
             fi
         done
         HTTPPort=$((8545 + i))
         WSPort=${HTTPPort}
+        MetricsPort=$((6060 + i))
 
-        nohup  ${workspace}/bin/geth --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+        cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
+        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
                             --password ${workspace}/.local/bsc/password.txt \
                             --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
                             -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-                            --metrics --metrics.addr 127.0.0.1 --metrics.expensive \
-                            --gcmode archive --syncmode=full --mine \
+                            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+                            --gcmode archive --syncmode=full --mine --vote \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }
@@ -286,6 +282,17 @@ uninstall_k8s)
     uninstall_k8s
     echo "===== end ===="
     ;;
+native_init)
+    echo "===== register ===="
+    register_validator
+    echo "===== end ===="
+    echo "===== clean ===="
+    clean
+    echo "===== generate configs ===="
+    prepare_config
+    generate
+    echo "===== end ===="
+    ;;
 native_start) # can re-entry
     echo "===== stop native ===="
     exit_previous
@@ -303,6 +310,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | install_k8s | uninstall_k8s | native_start | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | install_k8s | uninstall_k8s | native_init | native_start | native_stop"
     ;;
 esac

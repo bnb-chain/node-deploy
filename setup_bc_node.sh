@@ -24,26 +24,26 @@ function init() {
         node_ids="$(${workspace}/bin/bnbchaind tendermint show-node-id --home ${workspace}/.local/bc/node${i})@${pod_domain}:26656 ${node_ids}"
 
         # create delegator and operator account
-        echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node${i} > ${workspace}/.local/bc/node${i}/delegator.info
-        echo "${KEYPASS}" | ${workspace}/bin/bnbcli keys add node${i} --home ${workspace}/.local/bc/node${i} > ${workspace}/.local/bc/node${i}/operator.info
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node${i} > ${workspace}/.local/bc/node${i}/delegator.info
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys add node${i} --home ${workspace}/.local/bc/node${i} > ${workspace}/.local/bc/node${i}/operator.info
 
         # create validator
         nodeID=$(cat ${workspace}/.local/bc/node${i}/node.info | jq -r '.node_id')
         pubKey=$(cat ${workspace}/.local/bc/node${i}/node.info | jq -r '.pub_key')
-        delegator=$(${workspace}/bin/bnbcli keys list --home ${workspace}/.local/bc/node${i} | grep node${i}-delegator | awk -F" " '{print $3}')
-        ${workspace}/bin/bnbcli staking create-validator --chain-id=${BBC_CHAIN_ID} \
+        delegator=$(${workspace}/bin/tbnbcli keys list --home ${workspace}/.local/bc/node${i} | grep node${i}-delegator | awk -F" " '{print $3}')
+        ${workspace}/bin/tbnbcli staking create-validator --chain-id=${BBC_CHAIN_ID} \
             --from node${i} --pubkey ${pubKey} --amount=1000000000:BNB \
             --moniker=node${i} --address-delegator=${delegator} --commission-rate=0 \
             --commission-max-rate=0 --commission-max-change-rate=0 --proposal-id=0 \
             --node-id=${nodeID} --genesis-format --home ${workspace}/.local/bc/node${i} \
             --generate-only > ${workspace}/.local/bc/node${i}/node${i}-unsigned.json 
         
-        echo "${KEYPASS}" | ${workspace}/bin/bnbcli sign \
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli sign \
             ${workspace}/.local/bc/node${i}/node${i}-unsigned.json \
             --name "node${i}-delegator" --home ${workspace}/.local/bc/node${i} \
             --chain-id=${BBC_CHAIN_ID} --offline > ${workspace}/.local/bc/node${i}/node${i}-signed-t.json
         
-        echo "${KEYPASS}" | ${workspace}/bin/bnbcli sign \
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli sign \
             ${workspace}/.local/bc/node${i}/node${i}-signed-t.json \
             --name "node${i}" --home ${workspace}/.local/bc/node${i} \
             --chain-id=${BBC_CHAIN_ID} --offline > ${workspace}/.local/bc/genTx/node${i}.json
@@ -55,7 +55,7 @@ function init() {
         sed -i -e "s/timeout_commit = \"1s\"/timeout_commit = \"${BBC_BLOCK_TIMEOUT}\"/g" ${workspace}/.local/bc/node${i}/config/config.toml
     
         sed -i -e "s/breatheBlockInterval = 0/breatheBlockInterval = ${BBC_BreatheBlockInterval}/g" ${workspace}/.local/bc/node${i}/config/app.toml
-
+        sed -i -e "s/bech32PrefixAccAddr = \"bnb\"/bech32PrefixAccAddr = \"tbnb\"/g" ${workspace}/.local/bc/node${i}/config/app.toml
         
         sed -i -e "s/BEP6Height = 1/BEP6Height = 2/g" ${workspace}/.local/bc/node${i}/config/app.toml
         sed -i -e "s/BEP9Height = 1/BEP9Height = 2/g" ${workspace}/.local/bc/node${i}/config/app.toml
@@ -83,12 +83,13 @@ function init() {
         sed -i -e "s/BEP151Height = 9223372036854775807/BEP151Height = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
         sed -i -e "s/BEP153Height = 9223372036854775807/BEP153Height = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
         sed -i -e "s/BEP173Height = 9223372036854775807/BEP173Height = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
-        sed -i -e "s/FixDoubleSignChainIdHeight = 9223372036854775807/FixDoubleSignChainIdHeight = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
-        
+
+        sed -i -e "s/FixDoubleSignChainIdHeight = 9223372036854775807/FixDoubleSignChainIdHeight = 4\nBEP171Height = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
+        sed -i -e "s/BEP126Height = 9223372036854775807/BEP126Height = 5/g" ${workspace}/.local/bc/node${i}/config/app.toml
     done
 
     # generate genesis.json
-    ${workspace}/bin/bnbchaind collect-gentxs --chain-id ${BBC_CHAIN_ID} -i ${workspace}/.local/bc/genTx -o ${workspace}/.local/bc/genesis.json
+    ${workspace}/bin/bnbchaind collect-gentxs --acc-prefix tbnb --chain-id ${BBC_CHAIN_ID} -i ${workspace}/.local/bc/genTx -o ${workspace}/.local/bc/genesis.json
     sed -i -e "s/\"min_self_delegation\": \"1000000000000\"/\"min_self_delegation\": \"100000000\"/g" ${workspace}/.local/bc/genesis.json
     
     # copy genesis file and set persistent peers
@@ -99,6 +100,11 @@ function init() {
 
         sed -i -e "s/persistent_peers = \".*\"/persistent_peers = \"${persistent_peers}\"/g" ${workspace}/.local/bc/node${i}/config/config.toml
     done
+}
+
+function native_init(){
+    init
+    sed -i -e "s/persistent_peers = \".*\"/persistent_peers = \"\"/g" ${workspace}/.local/bc/node0/config/config.toml
 }
 
 function prepare_k8s_config() {
@@ -152,6 +158,11 @@ uninstall_k8s)
     uninstall_k8s
     echo "===== end ===="
     ;;
+native_init)
+    echo "===== native init ===="
+    native_init
+    echo "===== end ===="
+    ;;
 native_start) #only start node0!
     if [ ${BBC_CLUSTER_SIZE} -ne 1 ];then
         echo "native_start only support one node, please re-init with BBC_CLUSTER_SIZE=1"
@@ -163,7 +174,8 @@ native_start) #only start node0!
     echo "===== stop native node0 end ===="
 
     echo "===== start native node0 ===="
-    nohup ${workspace}/bin/bnbchaind start --home ${workspace}/.local/bc/node0 >> ${workspace}/.local/bc/node0/bc.log 2>&1 &
+    cp ${workspace}/bin/bnbchaind ${workspace}/.local/bc/node0/
+    nohup ${workspace}/.local/bc/node0/bnbchaind start --home ${workspace}/.local/bc/node0 >> ${workspace}/.local/bc/node0/bc.log 2>&1 &
     echo "===== start native node0 end ===="
     ;;
 native_stop)
@@ -173,6 +185,6 @@ native_stop)
     echo "===== stop native node0 end ===="
     ;;
 *)
-    echo "Usage: setup_bc_node.sh init | install_k8s | uninstall_k8s ｜ native_start | native_stop"
+    echo "Usage: setup_bc_node.sh init | install_k8s | uninstall_k8s ｜native_init | native_start | native_stop"
     ;;
 esac
