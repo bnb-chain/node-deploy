@@ -132,6 +132,10 @@ bash +x ./setup_bsc_relayer.sh native_stop
 bash +x ./setup_oracle_relayer.sh native_stop
 ```
 
+```bash
+# one cmd to start bsc cluster all alone
+bash +x ./setup_bsc_node.sh native_run_alone
+```
 #### Upgrade image
 ```bash
 kubectl set image statefulset/bc-node-0 bc=ghcr.io/bnb-chain/node:0.10.6 -n bc
