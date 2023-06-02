@@ -75,27 +75,27 @@ bash +x ./setup_bsc_relayer.sh install_k8s
 #native deploy without docker
 rm -rf .local
 
-bash +x ./setup_bc_node.sh native_init // support only one node
-bash +x ./setup_bc_node.sh native_start // can re-entry
+bash +x ./setup_bc_node.sh native_init 
+bash +x ./setup_bc_node.sh native_start 
 
 bash +x ./setup_bsc_node.sh native_init
-bash +x ./setup_bsc_node.sh native_start // can re-entry
+bash +x ./setup_bsc_node.sh native_start
 
 bash +x ./setup_bsc_relayer.sh native_init
-bash +x ./setup_bsc_relayer.sh native_start // can re-entry
+bash +x ./setup_bsc_relayer.sh native_start 
 
 bash +x ./setup_oracle_relayer.sh native_init
-bash +x ./setup_oracle_relayer.sh native_start // can re-entry
+bash +x ./setup_oracle_relayer.sh native_start 
 ```
 
 6. Execute cross chain transaction by sending BNB from BC to BSC
 ```bash
 ## 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791 is the address used by test-crosschain-transfer as sender
 ## macos
-echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date -v+300S +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from node0-delegator --chain-id Binance-Chain-Nile --node localhost:26657 --home ./.local/bc/node0
+echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date -v+300S +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from node0-delegator --chain-id Binance-Chain-Ganges --node localhost:26657 --home ./.local/bc/node0
 
 ## linux
-echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from local-user --chain-id Binance-Chain-Nile --node localhost:26657
+echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from local-user --chain-id Binance-Chain-Ganges --node localhost:26657
 ```
 
 7. Check the account balance
@@ -106,13 +106,13 @@ curl -X POST "http://localhost:8545" -H "Content-Type: application/json"  --data
 8. Execute cross chain transaction by sending BNB from BSC to BC
 ```
 
- ./bin/test-crosschain-transfer --amount 1 --rpc-url http://localhost:8545 --to 0x0cdce3d8d17c0553270064cee95c73f17534d5a0
+./bin/test-crosschain-transfer --amount 1 --rpc-url http://localhost:8545 --to 0x0cdce3d8d17c0553270064cee95c73f17534d5a0
 ```
 
 9. Check the account balance
 ``` bash
 ## The bech32 format of 0x0cdce3d8d17c0553270064cee95c73f17534d5a0 is tbnb1pnww8kx30sz4xfcqvn8wjhrn796nf4dqshlvlg.(you can use this tool https://slowli.github.io/bech32-buffer/ to do the convert)  
-./bin/tbnbcli account tbnb1pnww8kx30sz4xfcqvn8wjhrn796nf4dqshlvlg --chain-id Binance-Chain-Nile --node localhost:26657 --trust-node
+./bin/tbnbcli account tbnb1pnww8kx30sz4xfcqvn8wjhrn796nf4dqshlvlg --chain-id Binance-Chain-Ganges --node localhost:26657 --trust-node
 ```
 
 ## Additional Commands
