@@ -45,7 +45,7 @@ function register_validator() {
         fi
         sleep 6 #wait for including tx in block
         echo ${delegator} "balance"
-        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id=Binance-Chain-Nile --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
+        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id ${BBC_CHAIN_ID} --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
         echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
             --side-cons-addr "${cons_addr}" \
             --side-vote-addr "${vote_addr}" \
@@ -119,7 +119,6 @@ function prepare_config() {
     sed -i -e "s/alreadyInit = true;/enableMaliciousVoteSlash = true;\nalreadyInit = true;/g" ${workspace}/genesis/contracts/SlashIndicator.template
     sed -i -e "s/numOperator = 2;/operators[VALIDATOR_CONTRACT_ADDR] = true;\noperators[SLASH_CONTRACT_ADDR] = true;\nnumOperator = 4;/g" ${workspace}/genesis/contracts/SystemReward.template
     sed -i -e "s/for (uint i; i<validatorSetPkg.validatorSet.length; ++i) {/ValidatorExtra memory validatorExtra;\nfor (uint i; i<validatorSetPkg.validatorSet.length; ++i) {\n validatorExtraSet.push(validatorExtra);\n validatorExtraSet[i].voteAddress=validatorSetPkg.voteAddrs[i];/g" ${workspace}/genesis/contracts/BSCValidatorSet.template
-    sed -i -e "s/false/true/g" ${workspace}/genesis/generate-relayerhub.js
     sed -i -e "s/\"0x\" + publicKey.pop()/vs[4]/g" ${workspace}/genesis/generate-validator.js
     sed "s/{{INIT_HOLDER_ADDR}}/${INIT_HOLDER}/g" ${workspace}/genesis/init_holders.template > ${workspace}/genesis/init_holders.js
     if [ ${standalone} = false ]; then
@@ -148,12 +147,10 @@ function prepare_config() {
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
         echo "validator" ${i} ":" ${cons_addr}
         echo "validatorFee" ${i} ":" ${fee_addr}
-
-
+        echo "validatorVote" ${i} ":" ${vote_addr}
     done
 
     cd ${workspace}/genesis/
-    # sed -i -e "s/\"0x\" + publicKey.pop()/vs[4]/" generate-validator.js
     node generate-validator.js
     node generate-genesis.js --chainid ${BSC_CHAIN_ID} --bscChainId "$(printf '%04x\n' ${BSC_CHAIN_ID})"
 }
@@ -161,6 +158,7 @@ function prepare_config() {
 function generate() {
     cd ${workspace}
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    rm -rf  ${workspace}/*bsc.log*
     for ((i=0;i<${size};i++));do
         staticPeers=$(generate_static_peers ${size} ${i})
         line=`grep -n -e 'StaticNodes' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml | cut -d : -f 1`
@@ -186,10 +184,7 @@ function generate() {
         sed -i -e "s/MirrorSyncBlock = 1/MirrorSyncBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/BrunoBlock = 1/BrunoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e 's/DataDir/BLSPasswordFile = \"{{BLSPasswordFile}}\"\nDataDir/g' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        PassWordPath="${workspace}/.local/bsc/password.txt"
-        sed -i -e "s:{{BLSPasswordFile}}:${PassWordPath}:g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        
+        sed -i -e 's/PlatoBlock = 7/PlatoBlock = 7\nBerlinBlock = 8\nLondonBlock = 8\nHertzBlock= 8/' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
     done
 }
 
@@ -258,11 +253,12 @@ function native_start() {
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
                             --password ${workspace}/.local/bsc/password.txt \
+                            --blspassword ${workspace}/.local/bsc/password.txt \
                             --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
                             -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-                            --gcmode archive --syncmode=full --mine --vote \
+                            --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }
