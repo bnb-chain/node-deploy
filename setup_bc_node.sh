@@ -86,6 +86,7 @@ function init() {
 
         sed -i -e "s/FixDoubleSignChainIdHeight = 9223372036854775807/FixDoubleSignChainIdHeight = 4\nBEP171Height = 4/g" ${workspace}/.local/bc/node${i}/config/app.toml
         sed -i -e "s/BEP126Height = 9223372036854775807/BEP126Height = 5/g" ${workspace}/.local/bc/node${i}/config/app.toml
+        sed -i -e "s/BEP255Height = 9223372036854775807/BEP255Height = 5/g" ${workspace}/.local/bc/node${i}/config/app.toml
     done
 
     # generate genesis.json

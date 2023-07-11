@@ -16,7 +16,7 @@ function exit_previous() {
 
 # need a clean bc without stakings
 function register_validator() {
-    sleep 10 #wait for bc setup, otherwise may node-delegator not inclued in state
+    sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc
 
     for ((i=0;i<${size};i++));do
@@ -26,7 +26,7 @@ function register_validator() {
         cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         mkdir -p ${workspace}/.local/bsc/bls${i}
-        expect create_bls_key.sh ${workspace}/.local/bsc/bls${i}
+        expect create_bls_key.exp ${workspace}/.local/bsc/bls${i} ${KEYPASS}
         vote_addr=0x$(cat ${workspace}/.local/bsc/bls${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
         if [ ${standalone} = true ]; then
             continue
@@ -45,10 +45,12 @@ function register_validator() {
         fi
         sleep 6 #wait for including tx in block
         echo ${delegator} "balance"
-        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id ${BBC_CHAIN_ID} --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
+        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id ${BBC_CHAIN_ID} --trust-node --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
         echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
             --side-cons-addr "${cons_addr}" \
             --side-vote-addr "${vote_addr}" \
+            --bls-wallet ${workspace}/.local/bsc/bls${i}/bls/wallet \
+            --bls-password "${KEYPASS}" \
             --side-fee-addr "${fee_addr}" \
             --address-delegator "${delegator}" \
             --side-chain-id ${BSC_CHAIN_NAME} \
