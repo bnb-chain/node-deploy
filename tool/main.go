@@ -92,11 +92,15 @@ func main() {
 	flag.Parse()
 
 	if *bech32Addr != "" {
-		addr, err := btypes.AccAddressFromBech32(*bech32Addr)
+		Bech32PrefixAccAddr := "tbnb"
+		if *networkType == 1 {
+			Bech32PrefixAccAddr = "bnb"
+		}
+		bz, err := btypes.GetFromBech32(*bech32Addr, Bech32PrefixAccAddr)
 		if err != nil {
 			fmt.Println(err)
-			return
 		}
+		addr := btypes.AccAddress(bz)
 		fmt.Println(common.BytesToAddress(addr.Bytes()))
 	}
 

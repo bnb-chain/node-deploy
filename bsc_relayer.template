@@ -12,7 +12,7 @@
       "mnemonic_type": "local_mnemonic",
       "aws_region": "",
       "aws_secret_name": "",
-      "mnemonic": {{bbc_mnemonic}},
+      "mnemonic": "",
       "sleep_millisecond_for_wait_block": 500,
       "clean_up_block_interval": 20,
       "block_interval_for_clean_up_undelivered_packages": 1000,
