@@ -5,8 +5,6 @@ source ${workspace}/.env
 source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
 nodeurl="http://localhost:26657"
-replaceWhitelabelRelayer="0xb005741528b86F5952469d80A8614591E3c5B632"
-replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 standalone=false
 
 function exit_previous() {
@@ -97,37 +95,16 @@ function generate_static_peers() {
 
 function clean() {
     if ! [[ -f ${workspace}/bin/geth ]];then
-        echo "bin/geth do not exist!"
+        echo "bin/geth does not exist!"
         exit 1
     fi
     rm -rf ${workspace}/.local/bsc/clusterNetwork
     mkdir ${workspace}/.local/bsc/clusterNetwork
-    cd  ${workspace}/genesis
-    git stash
-    cd  ${workspace}
-    git submodule update --remote
-    cd  ${workspace}/genesis
-    npm install
 }
 
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
-    rm -f ${workspace}/genesis/init_holders.template
-    cp ${workspace}/init_holders.template ${workspace}/genesis/init_holders.template
 
-    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" ${workspace}/genesis/contracts/RelayerHub.template
-    sed -i -e "s/function whitelistInit() external/function whitelistInit() public/g" ${workspace}/genesis/contracts/RelayerHub.template
-    sed -i -e "s/alreadyInit = true;/whitelistInit();\nalreadyInit = true;/g" ${workspace}/genesis/contracts/RelayerHub.template
-    sed -i -e "s/alreadyInit = true;/enableMaliciousVoteSlash = true;\nalreadyInit = true;/g" ${workspace}/genesis/contracts/SlashIndicator.template
-    sed -i -e "s/numOperator = 2;/operators[VALIDATOR_CONTRACT_ADDR] = true;\noperators[SLASH_CONTRACT_ADDR] = true;\nnumOperator = 4;/g" ${workspace}/genesis/contracts/SystemReward.template
-    sed -i -e "s/for (uint i; i<validatorSetPkg.validatorSet.length; ++i) {/ValidatorExtra memory validatorExtra;\nfor (uint i; i<validatorSetPkg.validatorSet.length; ++i) {\n validatorExtraSet.push(validatorExtra);\n validatorExtraSet[i].voteAddress=validatorSetPkg.voteAddrs[i];/g" ${workspace}/genesis/contracts/BSCValidatorSet.template
-    sed -i -e "s/\"0x\" + publicKey.pop()/vs[4]/g" ${workspace}/genesis/generate-validator.js
-    sed "s/{{INIT_HOLDER_ADDR}}/${INIT_HOLDER}/g" ${workspace}/genesis/init_holders.template > ${workspace}/genesis/init_holders.js
-    if [ ${standalone} = false ]; then
-        initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
-        sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" ${workspace}/genesis/generate-tendermintlightclient.js
-    fi
-    
     for ((i=0;i<${size};i++));do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*;do
             cons_addr="0x$(cat ${f} | jq -r .address)"
@@ -154,13 +131,19 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     node generate-validator.js
-    node generate-genesis.js --chainid ${BSC_CHAIN_ID} --bscChainId "$(printf '%04x\n' ${BSC_CHAIN_ID})"
+    node generate-initHolders.js --initHolders ${INIT_HOLDER}
+    if [ ${standalone} = false ]; then
+        initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
+        node generate-genesis.js --chainid ${BSC_CHAIN_ID} --network 'local' --whitelist1Address ${INIT_HOLDER} --initConsensusStateBytes  ${initConsensusStateBytes}
+    else
+        node generate-genesis.js --chainid ${BSC_CHAIN_ID} --network 'local' --whitelist1Address ${INIT_HOLDER}
+    fi
+
 }
 
-function generate() {
-    cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    rm -rf  ${workspace}/*bsc.log*
+function initNetwork_k8s() {
+   cd ${workspace}
+   ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.ips=${ips_string} --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     for ((i=0;i<${size};i++));do
         staticPeers=$(generate_static_peers ${size} ${i})
         line=`grep -n -e 'StaticNodes' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml | cut -d : -f 1`
@@ -169,25 +152,14 @@ function generate() {
         tail -n +$(($line+1)) ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml >> ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml-e
         rm -f ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         mv ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml-e ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-
-        sed -i -e "s/TriesInMemory = 0/TriesInMemory = 128/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/NetworkId = 714/NetworkId = ${BSC_CHAIN_ID}/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-
-        sed -i -e '/BerlinBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/EWASMBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/CatalystBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/YoloV3Block/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/LondonBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/ArrowGlacierBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/MergeForkBlock/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/TerminalTotalDifficulty/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/BaseFee/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e '/RPCTxFeeCap/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/MirrorSyncBlock = 1/MirrorSyncBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/BrunoBlock = 1/BrunoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e "s/EulerBlock = 2/EulerBlock = 0\nNanoBlock = 0/g" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-        sed -i -e 's/PlatoBlock = 7/PlatoBlock = 7\nBerlinBlock = 8\nLondonBlock = 8\nHertzBlock= 8/' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
     done
+   rm -rf  ${workspace}/*bsc.log*
+}
+
+function initNetwork() {
+    cd ${workspace}
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    rm -rf  ${workspace}/*bsc.log*
 }
 
 function prepare_k8s_config() {
@@ -238,20 +210,14 @@ function native_start() {
             cons_addr="0x$(cat ${j} | jq -r .address)"
         done
 
-        # sorry for magic
-        for ((k=0;k<${size};k++));do
-            p2p_port_k=$((30311 + k))
-            if [ ${k} -ne ${i} ];then
-                sed -i.bak "s/bsc-node-${k}.bsc.svc.cluster.local:30311/localhost:${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-            else
-                sed -i.bak "s/\":30311/\":${p2p_port_k}/" ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
-            fi
-        done
         HTTPPort=$((8545 + i))
         WSPort=${HTTPPort}
         MetricsPort=$((6060 + i))
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
+        # init genesis
+        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
                             --password ${workspace}/.local/bsc/password.txt \
@@ -277,8 +243,20 @@ generate)
     clean
     echo "===== generate configs ===="
     prepare_config
-    generate
+    initNetwork
     echo "===== end ===="
+    ;;
+generate_k8s)
+    echo "===== clean ===="
+    clean
+    echo "===== generate configs for k8s ===="
+    prepare_config
+    initNetwork_k8s
+    echo "===== end ===="
+    ;;    
+clean)
+    echo "===== clean ===="
+    clean
     ;;
 install_k8s)
     echo "===== k8s install ===="
@@ -299,7 +277,7 @@ native_init)
     clean
     echo "===== generate configs ===="
     prepare_config
-    generate
+    initNetwork
     echo "===== end ===="
     ;;
 native_run_alone)
@@ -311,7 +289,7 @@ native_run_alone)
     clean
     echo "===== generate configs ===="
     prepare_config
-    generate
+    initNetwork
     echo "===== end ===="
     echo "===== start native ===="
     native_start
@@ -334,6 +312,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_stop"
     ;;
 esac

@@ -9,6 +9,7 @@ DatabaseCache = 512
 DatabaseFreezer = ""
 TrieCleanCache = 256
 TrieDirtyCache = 256
+TriesInMemory = 128
 TrieTimeout = 3600000000000
 EnablePreimageRecording = false
 EWASMInterpreter = ""
@@ -48,10 +49,9 @@ WSPort = 8545
 
 [Node.P2P]
 MaxPeers = 50
-NoDiscovery = true
+NoDiscovery = false
 StaticNodes = []
 TrustedNodes = []
-ListenAddr = ":30311"
 EnableMsgEvents = false
 
 [Node.HTTPTimeouts]
