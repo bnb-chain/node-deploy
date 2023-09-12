@@ -179,7 +179,8 @@ function prepare_k8s_config() {
 
         kubectl delete configmap config${i} -n bsc
         kubectl create configmap config${i} -n bsc \
-         --from-file ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+         --from-file ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+         --from-file ${workspace}/genesis/genesis.json 
 
         kubectl delete configmap nodekey${i} -n bsc
         kubectl create configmap nodekey${i} -n bsc \
