@@ -50,8 +50,19 @@ cp ./test-crosschain-transfer ../bin/test-crosschain-transfer
 ```bash
 make tool
 ```
-5. Setup all nodes.
+
+5. Configure the cluster
+   
+  You can configure the cluster by modifying the following files:
+   - `config.toml` 
+   - `genesis/genesis-template.json`
+   - `.env`
+
+6. Setup all nodes.
 two different ways, choose as you like.
+
+**On Kubernetes environment**
+
 ```bash
 #on k8s environment
 minikube start
@@ -61,7 +72,7 @@ bash +x ./setup_bc_node.sh install_k8s
 kubectl port-forward svc/bc-node-0 26657:26657 -n bc
 
 bash +x ./setup_bsc_node.sh register
-bash +x ./setup_bsc_node.sh generate
+bash +x ./setup_bsc_node.sh generate_k8s
 bash +x ./setup_bsc_node.sh install_k8s
 kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 
@@ -71,6 +82,8 @@ bash +x ./setup_oracle_relayer.sh install_k8s
 bash +x ./setup_bsc_relayer.sh docker
 bash +x ./setup_bsc_relayer.sh install_k8s
 ```
+
+**Natively**
 ```bash
 #native deploy without docker
 rm -rf .local
@@ -88,7 +101,13 @@ bash +x ./setup_oracle_relayer.sh native_init
 bash +x ./setup_oracle_relayer.sh native_start 
 ```
 
-6. Execute cross chain transaction by sending BNB from BC to BSC
+or simply
+``` bash
+# native deploy
+bash +x ./start_cluster.sh
+```
+
+7. Execute cross chain transaction by sending BNB from BC to BSC
 ```bash
 ## 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791 is the address used by test-crosschain-transfer as sender
 ## macos
@@ -98,7 +117,7 @@ echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --exp
 echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from local-user --chain-id Binance-Chain-Ganges --node localhost:26657
 ```
 
-7. Check the account balance
+8. Check the account balance
 ```
 curl -X POST "http://localhost:8545" -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x9fB29AAc15b9A4B7F17c3385939b007540f4d791", "latest"],"id":1}' 
 ```
@@ -131,6 +150,15 @@ bash +x ./setup_bsc_node.sh native_stop
 bash +x ./setup_bsc_relayer.sh native_stop
 bash +x ./setup_oracle_relayer.sh native_stop
 ```
+
+or simply
+
+```bash
+bash +x ./stop_cluster.sh
+```
+
+
+### Start a standalone BSC Cluster
 
 ```bash
 # one cmd to start bsc cluster all alone
