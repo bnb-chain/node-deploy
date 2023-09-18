@@ -50,7 +50,7 @@ spec:
           command: ["/bin/sh", "-c"]
           args: 
             - geth init --datadir /data /data/genesis.json;
-              geth --config /data/config.toml --datadir /data --ws --ws.port 8545 --ws.addr 0.0.0.0 --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain "*" --allow-insecure-unlock --mine --password /data/password.txt -unlock "0x$(cat /data/keystore/* | sed -n 's/.*"address":"\([^"]*\).*/\1/p')" --rpc.allow-unprotected-txs --gcmode archive --syncmode=full --nodekey /data/nodekey;
+              geth --config /data/config.toml --datadir /data --ws --ws.port 8545 --ws.addr 0.0.0.0 --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain "*" --allow-insecure-unlock --mine --password /data/password.txt -unlock "0x$(cat /data/keystore/* | sed -n 's/.*"address":"\([^"]*\).*/\1/p')" --miner.etherbase "0x$(cat /data/keystore/* | sed -n 's/.*"address":"\([^"]*\).*/\1/p')" --rpc.allow-unprotected-txs --gcmode archive --syncmode=full --nodekey /data/nodekey;
 
           ports:
             - name: http
