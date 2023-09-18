@@ -224,7 +224,7 @@ function native_start() {
                             --password ${workspace}/.local/bsc/password.txt \
                             --blspassword ${workspace}/.local/bsc/password.txt \
                             --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
-                            -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                            -unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
                             --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
