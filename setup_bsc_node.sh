@@ -7,25 +7,40 @@ size=$((${BSC_CLUSTER_SIZE}))
 nodeurl="http://localhost:26657"
 standalone=false
 
+keys_dir_name="keys" # directory to store all the keys in
+
 function exit_previous() {
 	# stop client
     ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
 }
 
+authorities=("alice" "bob" "charlie" "dave" "eve")
+
 # need a clean bc without stakings
 function register_validator() {
     sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
-    rm -rf ${workspace}/.local/bsc
+    rm -rf ${workspace}/.local/bsc 
+    mkdir -p ${workspace}/.local/bsc
+    if [ -d "${workspace}/${keys_dir_name}" ]; then
+        echo "${KEYPASS}" > ${workspace}/.local/password.txt
+    else
+        echo "${keys_dir_name} directory does not exist"
+        exit 1
+    fi
 
     for ((i=0;i<${size};i++));do
-        mkdir -p ${workspace}/.local/bsc/validator${i}
-        echo "${KEYPASS}" > ${workspace}/.local/bsc/password.txt
-        
-        cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
-        fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
-        mkdir -p ${workspace}/.local/bsc/bls${i}
-        expect create_bls_key.exp ${workspace}/.local/bsc/bls${i} ${KEYPASS}
-        vote_addr=0x$(cat ${workspace}/.local/bsc/bls${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
+        echo "${authorities[i]}'s addresses: "
+        cd ${workspace}/${keys_dir_name}/${authorities[i]}
+        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+        echo "  Consensus Address: ${cons_addr}"
+        fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
+        echo "  Fee Address: ${fee_addr}"
+        vote_addr=0x$(cat bls/keystore/*json | jq .pubkey | sed 's/"//g')
+        echo "  BLS Vote Address: ${vote_addr}"
+        echo 
+
+        cd ${workspace}
+    
         if [ ${standalone} = true ]; then
             continue
         fi
@@ -106,14 +121,11 @@ function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
     for ((i=0;i<${size};i++));do
-        for f in ${workspace}/.local/bsc/validator${i}/keystore/*;do
-            cons_addr="0x$(cat ${f} | jq -r .address)"
-        done
-        
-        for f in ${workspace}/.local/bsc/validator${i}_fee/keystore/*;do
-            fee_addr="0x$(cat ${f} | jq -r .address)"
-        done
-        
+        cd ${workspace}/${keys_dir_name}/${authorities[i]}
+        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+        fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
+        vote_addr=0x$(cat bls/keystore/*json| jq .pubkey | sed 's/"//g')
+        cd ${workspace}
         mkdir -p ${workspace}/.local/bsc/clusterNetwork/node${i}
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
@@ -121,8 +133,6 @@ function prepare_config() {
             bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
             powers=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
         fi
-        mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
-        vote_addr=0x$(cat ${workspace}/.local/bsc/clusterNetwork/node${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
         echo "validator" ${i} ":" ${cons_addr}
         echo "validatorFee" ${i} ":" ${fee_addr}
@@ -175,7 +185,7 @@ function prepare_k8s_config() {
 
         kubectl delete secret password -n bsc
         kubectl create secret generic password -n bsc \
-         --from-file ${workspace}/.local/bsc/password.txt
+         --from-file ${workspace}/.local/password.txt
 
         kubectl delete configmap config${i} -n bsc
         kubectl create configmap config${i} -n bsc \
@@ -206,14 +216,14 @@ function uninstall_k8s() {
 
 function native_start() {
     for ((i=0;i<${size};i++));do
-        cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
-        for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
-            cons_addr="0x$(cat ${j} | jq -r .address)"
-        done
-
+        cd ${workspace}/${keys_dir_name}/${authorities[i]}
+        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+        cd ${workspace}
         HTTPPort=$((8545 + i))
         WSPort=${HTTPPort}
         MetricsPort=$((6060 + i))
+
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
         # init genesis
@@ -221,8 +231,8 @@ function native_start() {
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
-                            --password ${workspace}/.local/bsc/password.txt \
-                            --blspassword ${workspace}/.local/bsc/password.txt \
+                            --password ${workspace}/.local/password.txt \
+                            --blspassword ${workspace}/.local/password.txt \
                             --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
                             -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
