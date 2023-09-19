@@ -126,7 +126,6 @@ function prepare_config() {
         fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
         vote_addr=0x$(cat bls/keystore/*json| jq .pubkey | sed 's/"//g')
         cd ${workspace}
-        mkdir -p ${workspace}/.local/bsc/clusterNetwork/node${i}
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
         if [ ${standalone} = false ]; then
