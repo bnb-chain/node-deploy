@@ -4,17 +4,29 @@ workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
+initial_size=${BSC_CLUSTER_INITIAL_SIZE}
 nodeurl="http://localhost:26657"
-standalone=false
-
+standalone=false 
+authorities=("alice" "bob" "charlie" "dave" "eve") # predefined authorities
 keys_dir_name="keys" # directory to store all the keys in
+
+if [ ${size} -gt ${#authorities[@]} ]; then 
+    echo "ERROR: BSC_CLUSTER_SIZE cannot be bigger than ${#authorities[@]}"
+    exit 1
+fi
+
+if [ ${initial_size} -gt ${size} ]; then 
+    echo "ERROR: BSC_CLUSTER_INITIAL_SIZE cannot be bigger than BSC_CLUSTER_SIZE"
+    exit 1
+fi
+
+
 
 function exit_previous() {
 	# stop client
     ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
 }
 
-authorities=("alice" "bob" "charlie" "dave" "eve")
 
 # need a clean bc without stakings
 function register_validator() {
@@ -214,7 +226,7 @@ function uninstall_k8s() {
 }
 
 function native_start() {
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${initial_size};i++));do
         cd ${workspace}/${keys_dir_name}/${authorities[i]}
         cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
         cd ${workspace}
