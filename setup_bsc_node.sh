@@ -62,7 +62,7 @@ function register_validator() {
         echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
             --side-cons-addr "${cons_addr}" \
             --side-vote-addr "${vote_addr}" \
-            --bls-wallet ${workspace}/.local/bsc/bls${i}/bls/wallet \
+            --bls-wallet ${workspace}/${keys_dir_name}/${authorities[i]}/bls/wallet \
             --bls-password "${KEYPASS}" \
             --side-fee-addr "${fee_addr}" \
             --address-delegator "${delegator}" \
@@ -224,6 +224,7 @@ function native_start() {
         MetricsPort=$((6060 + i))
 
         cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
         # init genesis
