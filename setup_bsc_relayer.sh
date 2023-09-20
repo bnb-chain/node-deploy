@@ -39,7 +39,7 @@ function prepare_k8s_config() {
 
 function prepare_native_config() {
     init_config
-    LAN_IP=$(ifconfig |grep 192.168 |awk -F" " '{print $2}')
+    LAN_IP=$(ifconfig |grep 192.168 |awk -F" " '{print $2}' |head -1)
     sed -i -e "s/bc-node-0.bc.svc.cluster.local/${LAN_IP}/g" ${workspace}/.local/relayer/bsc_relayer.json
     sed -i -e "s/bsc-node-0.bsc.svc.cluster.local/${LAN_IP}/g" ${workspace}/.local/relayer/bsc_relayer.json 
     sed -i -e "s:/data/relayer.db:${workspace}/.local/relayer/bsc_relayer.db:g" ${workspace}/.local/relayer/bsc_relayer.json 
