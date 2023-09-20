@@ -1,5 +1,5 @@
 [submodule "genesis"]
 	path = genesis
 	url = ../bsc-genesis-contract.git
-	branch = master
+	branch = develop
 	ignore = dirty
