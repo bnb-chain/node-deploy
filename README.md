@@ -6,8 +6,9 @@ Before proceeding to the next steps, please ensure that the following packages a
 - solc: 0.6.4
 - nodejs: 12.18.3 
 - npm: 6.14.6
-- go: 1.18
+- go: 1.18+
 - expect
+- foundry
 - jq
 If you would setup nodes on k8s environment, the following packages and softwares are neccessary:
 - helm: 3.9.4

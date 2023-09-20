@@ -6,6 +6,9 @@ source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
 nodeurl="http://localhost:26657"
 standalone=false
+replaceWhitelabelRelayer="0xA904540818AC9c47f2321F97F1069B9d8746c6DB"
+replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
+stateSchem="hash"
 
 function exit_previous() {
 	# stop client
@@ -24,7 +27,7 @@ function register_validator() {
         cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         fee_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
         mkdir -p ${workspace}/.local/bsc/bls${i}
-        expect create_bls_key.exp ${workspace}/.local/bsc/bls${i} ${KEYPASS}
+        ${workspace}/bin/geth bls account new --datadir ${workspace}/.local/bsc/bls${i} --blspassword ${workspace}/.local/bsc/password.txt
         vote_addr=0x$(cat ${workspace}/.local/bsc/bls${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
         if [ ${standalone} = true ]; then
             continue
@@ -100,6 +103,7 @@ function clean() {
     fi
     rm -rf ${workspace}/.local/bsc/clusterNetwork
     mkdir ${workspace}/.local/bsc/clusterNetwork
+
     cd  ${workspace}/genesis
     cp ./genesis-template.json ../
     git stash
@@ -137,16 +141,22 @@ function prepare_config() {
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
 
-    cd ${workspace}/genesis/
+    cd ${workspace}/genesis/scripts
+    sed -i -e "s/'0x' + publicKey.pop()/vs[4]/g" generate-validator.js
     node generate-validator.js
     node generate-initHolders.js --initHolders ${INIT_HOLDER}
+    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" generate-relayerHub.sh
     if [ ${standalone} = false ]; then
         initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
-        node generate-genesis.js --chainid ${BSC_CHAIN_ID} --network 'local' --whitelist1Address ${INIT_HOLDER} --initConsensusStateBytes  ${initConsensusStateBytes}
-    else
-        node generate-genesis.js --chainid ${BSC_CHAIN_ID} --network 'local' --whitelist1Address ${INIT_HOLDER}
+        sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" generate.sh
     fi
+    
+    rm ${workspace}/genesis/lib/forge-std
+    forge install --no-git --no-commit foundry-rs/forge-std@v1.1.1
 
+    cd ${workspace}/genesis
+    # use 714 as `chainId` by default
+    bash scripts/generate.sh local
 }
 
 function initNetwork_k8s() {
@@ -225,7 +235,7 @@ function native_start() {
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
         # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
@@ -235,7 +245,7 @@ function native_start() {
                             -unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-                            --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+                            --gcmode archive --syncmode=full --state.scheme ${stateSchem} --mine --vote --monitor.maliciousvote \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }
