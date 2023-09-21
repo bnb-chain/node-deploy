@@ -225,32 +225,38 @@ function uninstall_k8s() {
     done
 }
 
+function native_start_single() {
+    i="$1"
+    cd ${workspace}/${keys_dir_name}/${authorities[i]}
+    cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+    cd ${workspace}
+    HTTPPort=$((8545 + i))
+    WSPort=${HTTPPort}
+    MetricsPort=$((6060 + i))
+
+    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
+    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
+
+    cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
+    # init genesis
+    ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+    # run BSC node
+    nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+            --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
+            --password ${workspace}/.local/password.txt \
+            --blspassword ${workspace}/.local/password.txt \
+            --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
+            -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+            --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+            > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+
+}
+
 function native_start() {
     for ((i=0;i<${initial_size};i++));do
-        cd ${workspace}/${keys_dir_name}/${authorities[i]}
-        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
-        cd ${workspace}
-        HTTPPort=$((8545 + i))
-        WSPort=${HTTPPort}
-        MetricsPort=$((6060 + i))
-
-        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
-        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
-
-        cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
-        # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
-        # run BSC node
-        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
-                            --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
-                            --password ${workspace}/.local/password.txt \
-                            --blspassword ${workspace}/.local/password.txt \
-                            --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
-                            -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-                            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-                            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-                            --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
-                            > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+       native_start_single "$i"
     done
 }
 
@@ -328,6 +334,11 @@ native_start) # can re-entry
     native_start
     echo "===== start native end ===="
     ;;
+native_start_single)
+    echo "===== start native single ===="
+    native_start_single $2
+    echo "===== start native single end ===="
+    ;;
 native_stop)
     echo "===== stop native ===="
     exit_previous
@@ -335,6 +346,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_start_single | native_stop"
     ;;
 esac
