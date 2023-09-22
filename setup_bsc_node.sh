@@ -3,15 +3,22 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
-size=$((${BSC_CLUSTER_SIZE}))
+size=${BSC_CLUSTER_SIZE}
+validator_size=${BSC_VALIDATOR_SIZE}
 initial_size=${BSC_CLUSTER_INITIAL_SIZE}
 nodeurl="http://localhost:26657"
 standalone=false 
 authorities=("alice" "bob" "charlie" "dave" "eve") # predefined authorities
 keys_dir_name="keys" # directory to store all the keys in
 
-if [ ${size} -gt ${#authorities[@]} ]; then 
-    echo "ERROR: BSC_CLUSTER_SIZE cannot be bigger than ${#authorities[@]}"
+if [ ${validator_size} -gt ${#authorities[@]} ]; then 
+    echo "ERROR: BSC_VALIDATOR_SIZE cannot be bigger than ${#authorities[@]}"
+    exit 1
+fi
+
+
+if [ ${validator_size} -gt ${size} ]; then 
+    echo "ERROR: BSC_VALIDATOR_SIZE cannot be bigger than BSC_CLUSTER_SIZE"
     exit 1
 fi
 
@@ -24,7 +31,7 @@ fi
 
 function exit_previous() {
 	# stop client
-    ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
+    ps -ef  | grep geth | grep bsc |awk '{print $2}' | xargs kill
 }
 
 
@@ -40,7 +47,7 @@ function register_validator() {
         exit 1
     fi
 
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validator_size};i++));do
         echo "${authorities[i]}'s addresses: "
         cd ${workspace}/${keys_dir_name}/${authorities[i]}
         cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
@@ -132,7 +139,7 @@ function clean() {
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validator_size};i++));do
         cd ${workspace}/${keys_dir_name}/${authorities[i]}
         cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
         fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
@@ -141,8 +148,8 @@ function prepare_config() {
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
         if [ ${standalone} = false ]; then
-            bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
-            powers=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
+            bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${validator_size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
+            powers=`${workspace}/bin/tbnbcli staking side-top-validators ${validator_size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
         fi
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
         echo "validator" ${i} ":" ${cons_addr}
@@ -180,6 +187,18 @@ function initNetwork_k8s() {
 function initNetwork() {
     cd ${workspace}
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    # copy keys to validators' folders
+    for ((i=0;i<${validator_size};i++));do
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
+    done
+
+    # copy geth binary to all nodes' folders
+    for ((i=0;i<${size};i++));do
+        cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
+        # init genesis
+        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+    done
     rm -rf  ${workspace}/*bsc.log*
 }
 
@@ -227,31 +246,39 @@ function uninstall_k8s() {
 
 function native_start_single() {
     i="$1"
-    cd ${workspace}/${keys_dir_name}/${authorities[i]}
-    cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
-    cd ${workspace}
     HTTPPort=$((8545 + i))
     WSPort=${HTTPPort}
     MetricsPort=$((6060 + i))
 
-    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
-    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
 
-    cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
-    # init genesis
-    ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
-    # run BSC node
-    nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+    # validator node
+    if [ $i -lt ${validator_size} ]; then
+        cd ${workspace}/${keys_dir_name}/${authorities[i]}
+        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+        cd ${workspace}
+        # run BSC validator node
+        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
+                --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
+                --password ${workspace}/.local/password.txt \
+                --blspassword ${workspace}/.local/password.txt \
+                --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
+                -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+                --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+                --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+                > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+    else
+        # run normal BSC node
+        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
             --password ${workspace}/.local/password.txt \
-            --blspassword ${workspace}/.local/password.txt \
             --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
-            -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+            --gcmode archive --syncmode=full  \
             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
-
+    fi
 }
 
 function native_start() {

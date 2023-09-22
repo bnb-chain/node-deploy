@@ -4,10 +4,11 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 
-size=$((${BSC_CLUSTER_SIZE}))
+
 keys_dir_name="keys" # directory to store all the keys in
 
 authorities=("alice" "bob" "charlie" "dave" "eve")
+size=${#authorities[@]}
 
 function generate_keys() {
     rm -rf ${workspace}/${keys_dir_name}
