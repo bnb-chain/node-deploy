@@ -3,30 +3,18 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
-size=${BSC_CLUSTER_SIZE}
+node_size=${BSC_NODE_SIZE}
 validator_size=${BSC_VALIDATOR_SIZE}
-initial_size=${BSC_CLUSTER_INITIAL_SIZE}
 nodeurl="http://localhost:26657"
 standalone=false 
 authorities=("alice" "bob" "charlie" "dave" "eve") # predefined authorities
 keys_dir_name="keys" # directory to store all the keys in
+validators_dir_name="validators" # directory to store all validator nodes
 
 if [ ${validator_size} -gt ${#authorities[@]} ]; then 
     echo "ERROR: BSC_VALIDATOR_SIZE cannot be bigger than ${#authorities[@]}"
     exit 1
 fi
-
-
-if [ ${validator_size} -gt ${size} ]; then 
-    echo "ERROR: BSC_VALIDATOR_SIZE cannot be bigger than BSC_CLUSTER_SIZE"
-    exit 1
-fi
-
-if [ ${initial_size} -gt ${size} ]; then 
-    echo "ERROR: BSC_CLUSTER_INITIAL_SIZE cannot be bigger than BSC_CLUSTER_SIZE"
-    exit 1
-fi
-
 
 
 function exit_previous() {
@@ -37,15 +25,22 @@ function exit_previous() {
 
 # need a clean bc without stakings
 function register_validator() {
-    sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc 
     mkdir -p ${workspace}/.local/bsc
+
     if [ -d "${workspace}/${keys_dir_name}" ]; then
         echo "${KEYPASS}" > ${workspace}/.local/password.txt
     else
         echo "${keys_dir_name} directory does not exist"
         exit 1
     fi
+
+
+    if [ ${standalone} = true ]; then
+            return
+    fi
+    
+    sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
 
     for ((i=0;i<${validator_size};i++));do
         echo "${authorities[i]}'s addresses: "
@@ -59,10 +54,6 @@ function register_validator() {
         echo 
 
         cd ${workspace}
-    
-        if [ ${standalone} = true ]; then
-            continue
-        fi
         
         node_dir_index=${i}
         if [ $i -ge ${BBC_CLUSTER_SIZE} ]; then
@@ -186,18 +177,33 @@ function initNetwork_k8s() {
 
 function initNetwork() {
     cd ${workspace}
+    mkdir -p ${workspace}/.local/bsc/clusterNetwork/${validators_dir_name} # root directory for validators
+    size=$((${validator_size} + ${node_size}))
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    # copy keys to validators' folders
+    # initialize validators
+    # rename validator folders to alice, bob ... and  copy keys to validators' folders
     for ((i=0;i<${validator_size};i++));do
-        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}
-        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
+        validator_folder=${workspace}/.local/bsc/clusterNetwork/${validators_dir_name}/${authorities[i]}
+        mv  ${workspace}/.local/bsc/clusterNetwork/node${i}  ${validator_folder}
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${validator_folder}
+        cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${validator_folder}
+        # copy geth binary
+        mkdir -p ${validator_folder}/bin
+        cp ${workspace}/bin/geth ${validator_folder}/bin/geth
+        # init genesis
+        ${validator_folder}/bin/geth init --datadir ${validator_folder} genesis/genesis.json
     done
 
-    # copy geth binary to all nodes' folders
-    for ((i=0;i<${size};i++));do
-        cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
+    # initialize normal nodes
+    for ((i=0;i<${node_size};i++));do
+        # normal nodes need to be renamed to start from node0
+        node_folder=${workspace}/.local/bsc/clusterNetwork/node${i}
+        mv ${workspace}/.local/bsc/clusterNetwork/node$((${validator_size}+$i)) ${node_folder}
+        # copy geth binary
+        mkdir -p ${node_folder}/bin
+        cp ${workspace}/bin/geth ${node_folder}/bin/geth
         # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        ${node_folder}/bin/geth init --datadir ${node_folder} genesis/genesis.json
     done
     rm -rf  ${workspace}/*bsc.log*
 }
@@ -244,46 +250,69 @@ function uninstall_k8s() {
     done
 }
 
-function native_start_single() {
+function start_validator() {
     i="$1"
     HTTPPort=$((8545 + i))
     WSPort=${HTTPPort}
     MetricsPort=$((6060 + i))
+    validator_folder=${workspace}/.local/bsc/clusterNetwork/${validators_dir_name}/${authorities[i]}
+    cd ${validator_folder}
+    cons_addr="0x$(cat keystore/* | jq -r .address)"
+    cd ${workspace}
+    # run BSC validator
+    nohup  ${validator_folder}/bin/geth --config ${validator_folder}/config.toml \
+        --datadir ${validator_folder} \
+        --password ${workspace}/.local/password.txt \
+        --blspassword ${workspace}/.local/password.txt \
+        --nodekey ${validator_folder}/geth/nodekey \
+        -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+        --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+        --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+        > ${validator_folder}/bsc-node.log 2>&1 &
+}
 
-
-    # validator node
-    if [ $i -lt ${validator_size} ]; then
-        cd ${workspace}/${keys_dir_name}/${authorities[i]}
-        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
-        cd ${workspace}
-        # run BSC validator node
-        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
-                --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
-                --password ${workspace}/.local/password.txt \
-                --blspassword ${workspace}/.local/password.txt \
-                --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
-                -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-                --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-                --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-                --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
-                > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+function native_start_single_validator() {
+    authority_name="$1"
+    $i= $(get_index ${authorities[@]} ${authority_name})
+    if [ $i -lt 0 ]; then 
+        echo "ERROR: validator with name ${authority_name} not found."
+        exit 1
     else
-        # run normal BSC node
-        nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
-            --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
-            --password ${workspace}/.local/password.txt \
-            --nodekey ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey \
-            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode archive --syncmode=full  \
-            > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+       $(start_validator $i)
     fi
 }
 
+function native_start_single_node() {
+    i="$1"
+    HTTPPort=$((9545 + i))
+    WSPort=${HTTPPort}
+    MetricsPort=$((7060 + i))
+    node_folder=${workspace}/.local/bsc/clusterNetwork/node${i}
+   
+    # run normal BSC node
+    nohup  ${node_folder}/bin/geth --config ${node_folder}/config.toml \
+        --datadir ${node_folder} \
+        --password ${workspace}/.local/password.txt \
+        --nodekey ${node_folder}/geth/nodekey \
+        --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+        --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+        --gcmode archive --syncmode=full  \
+        > ${node_folder}/bsc-node.log 2>&1 &
+}
+
 function native_start() {
-    for ((i=0;i<${initial_size};i++));do
-       native_start_single "$i"
+    # start validators
+    echo "Starting validators..."
+    for ((i=0;i<${validator_size};i++));do
+        start_validator $i
+    done
+
+    # start normal nodes
+    echo "Starting full nodes..."
+    for ((i=0;i<${node_size};i++));do
+        native_start_single_node $i
     done
 }
 
@@ -366,6 +395,11 @@ native_start_single)
     native_start_single $2
     echo "===== start native single end ===="
     ;;
+native_start_single_validator)
+    echo "===== start native single ===="
+    native_start_single_validator $2
+    echo "===== start native single end ===="
+    ;;
 native_stop)
     echo "===== stop native ===="
     exit_previous
@@ -373,6 +407,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_start_single | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_start_single <i> | native_start_single_validator <validator_name> | native_stop"
     ;;
 esac
