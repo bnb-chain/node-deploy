@@ -22,6 +22,149 @@ function exit_previous() {
     ps -ef  | grep geth | grep bsc |awk '{print $2}' | xargs kill
 }
 
+function stop_validator() {
+    authority_name="$1"
+    echo "Stopping ${authority_name}"
+    ps -ef | grep geth | grep bsc | grep "${authority_name}" | awk '{print $2}' | xargs kill
+}
+
+function is_validator_running() {
+    authority_name="$1"
+    output=$(ps -ef | grep geth | grep bsc | grep "${authority_name}")
+    if [[ -n $output ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+function run_validator() {
+    authority_name="$1"
+    i=$(get_index "${authority_name}" "${authorities[@]}")
+    if [ $i -lt 0 ]; then 
+        echo "ERROR: validator with name ${authority_name} not found."
+        exit 1
+    fi
+    validator_folder=${workspace}/.local/bsc/clusterNetwork/${validators_dir_name}/${authorities[i]}
+    # check if validator is already setup
+    if [ ! -d "${validator_folder}" ]; then
+        echo "Validator ${authority_name} not yet set up. Setting up..."
+        register_validator_single $i # register in beacon chain
+        init_extra_validator $i # create and initialize the datadir
+    else
+        echo "Validator ${authority_name} already set up."
+    fi
+
+    # check if validator is already running
+    is_validator_running ${authority_name}
+    result=$?
+    if [ $result -eq 1 ]; then 
+        echo "Validator ${authority_name} is already up and running."
+        exit 0
+    else 
+        echo "Running ${authority_name}..."
+    fi
+
+    if [ $i -lt ${validator_size} ]; then
+        $(start_validator $i)
+    else
+        $(start_extra_validator $i)
+    fi
+}
+
+
+function init_extra_validator() {
+    i="$1"
+    validator_folder=${workspace}/.local/bsc/clusterNetwork/${validators_dir_name}/${authorities[i]}
+    mkdir -p ${validator_folder}
+    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/bls ${validator_folder}
+    cp -R ${workspace}/${keys_dir_name}/${authorities[i]}/consensus/keystore ${validator_folder}
+    # copy geth binary
+    mkdir -p ${validator_folder}/bin
+    cp ${workspace}/bin/geth ${validator_folder}/bin/geth
+
+    # copy genesis.json and config.toml
+    cp ${workspace}/genesis/genesis.json ${validator_folder}
+    cp ${workspace}/config.toml ${validator_folder}
+
+    # init genesis
+    ${validator_folder}/bin/geth init --datadir ${validator_folder} genesis/genesis.json
+}
+
+function start_extra_validator(){
+    i="$1"
+    HTTPPort=$((8545 + i))
+    WSPort=${HTTPPort}
+    MetricsPort=$((6060 + i))
+    validator_folder=${workspace}/.local/bsc/clusterNetwork/${validators_dir_name}/${authorities[i]}
+    cd ${validator_folder}
+    cons_addr="0x$(cat keystore/* | jq -r .address)"
+    cd ${workspace}
+    # run extra BSC validator
+    nohup  ${validator_folder}/bin/geth --config ${validator_folder}/config.toml \
+        --datadir ${validator_folder} \
+        --password ${workspace}/.local/password.txt \
+        --blspassword ${workspace}/.local/password.txt \
+        --nodekey ${validator_folder}/geth/nodekey \
+        -unlock ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+        --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+        --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
+        --bootnodes "enode://d9da604d126271999f6724b3e698a852cc1fc77fca0ea5257b1bd9899a7c785624438908f7799bfea398659de9969da592241aa6a77972fe2fa61b5a812c43af@127.0.0.1:30312,enode://3bbefcb9b4a816c0977cc50f42ff066534adbc55fc91e7bcfbc2b4139a483b00251af242e3d46e2caff9f02a437ddba2b5e386a044ae228fea0299dd146063cd@127.0.0.1:30313" \
+        --port $((30311+${node_size} +$i)) \
+        > ${validator_folder}/bsc-node.log 2>&1 &
+
+}
+
+function register_validator_single() {
+    i="$1"
+    echo "${authorities[i]}'s addresses: "
+    cd ${workspace}/${keys_dir_name}/${authorities[i]}
+    cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+    echo "  Consensus Address: ${cons_addr}"
+    fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
+    echo "  Fee Address: ${fee_addr}"
+    vote_addr=0x$(cat bls/keystore/*json | jq .pubkey | sed 's/"//g')
+    echo "  BLS Vote Address: ${vote_addr}"
+    echo 
+
+    cd ${workspace}
+    
+    node_dir_index=${i}
+    if [ $i -ge ${BBC_CLUSTER_SIZE} ]; then
+        # echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys delete node${i}-delegator --home ${workspace}/.local/bc/node0 # for re-entry
+        echo "${KEYPASS}" | (echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node0)
+        node_dir_index=0
+    fi
+    delegator=$(${workspace}/bin/tbnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
+    if [ "$i" != "0" ]; then
+        sleep 6 #wait for including tx in block
+        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
+    fi
+    sleep 6 #wait for including tx in block
+    echo ${delegator} "balance"
+    ${workspace}/bin/tbnbcli account ${delegator}  --chain-id ${BBC_CHAIN_ID} --trust-node --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
+    echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
+        --side-cons-addr "${cons_addr}" \
+        --side-vote-addr "${vote_addr}" \
+        --bls-wallet ${workspace}/${keys_dir_name}/${authorities[i]}/bls/wallet \
+        --bls-password "${KEYPASS}" \
+        --side-fee-addr "${fee_addr}" \
+        --address-delegator "${delegator}" \
+        --side-chain-id ${BSC_CHAIN_NAME} \
+        --amount 2000000000000:BNB \
+        --commission-rate 80000000 \
+        --commission-max-rate 95000000 \
+        --commission-max-change-rate 3000000 \
+        --moniker "${cons_addr}" \
+        --details "${cons_addr}" \
+        --identity "${delegator}" \
+        --from node${i}-delegator \
+        --chain-id "${BBC_CHAIN_ID}" \
+        --node ${nodeurl} \
+        --home ${workspace}/.local/bc/node${node_dir_index}
+
+}
 
 # need a clean bc without stakings
 function register_validator() {
@@ -40,54 +183,10 @@ function register_validator() {
             return
     fi
     
-    sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
+    sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not included in state
 
     for ((i=0;i<${validator_size};i++));do
-        echo "${authorities[i]}'s addresses: "
-        cd ${workspace}/${keys_dir_name}/${authorities[i]}
-        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
-        echo "  Consensus Address: ${cons_addr}"
-        fee_addr="0x$(cat fee/keystore/* | jq -r .address)"
-        echo "  Fee Address: ${fee_addr}"
-        vote_addr=0x$(cat bls/keystore/*json | jq .pubkey | sed 's/"//g')
-        echo "  BLS Vote Address: ${vote_addr}"
-        echo 
-
-        cd ${workspace}
-        
-        node_dir_index=${i}
-        if [ $i -ge ${BBC_CLUSTER_SIZE} ]; then
-            # echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys delete node${i}-delegator --home ${workspace}/.local/bc/node0 # for re-entry
-            echo "${KEYPASS}" | (echo "${KEYPASS}" | ${workspace}/bin/tbnbcli keys add node${i}-delegator --home ${workspace}/.local/bc/node0)
-            node_dir_index=0
-        fi
-        delegator=$(${workspace}/bin/tbnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
-        if [ "$i" != "0" ]; then
-            sleep 6 #wait for including tx in block
-            echo "${KEYPASS}" | ${workspace}/bin/tbnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
-        fi
-        sleep 6 #wait for including tx in block
-        echo ${delegator} "balance"
-        ${workspace}/bin/tbnbcli account ${delegator}  --chain-id ${BBC_CHAIN_ID} --trust-node --home ${workspace}/.local/bc/node${node_dir_index} | jq .value.base.coins
-        echo "${KEYPASS}" | ${workspace}/bin/tbnbcli staking bsc-create-validator \
-            --side-cons-addr "${cons_addr}" \
-            --side-vote-addr "${vote_addr}" \
-            --bls-wallet ${workspace}/${keys_dir_name}/${authorities[i]}/bls/wallet \
-            --bls-password "${KEYPASS}" \
-            --side-fee-addr "${fee_addr}" \
-            --address-delegator "${delegator}" \
-            --side-chain-id ${BSC_CHAIN_NAME} \
-            --amount 2000000000000:BNB \
-            --commission-rate 80000000 \
-            --commission-max-rate 95000000 \
-            --commission-max-change-rate 3000000 \
-            --moniker "${cons_addr}" \
-            --details "${cons_addr}" \
-            --identity "${delegator}" \
-            --from node${i}-delegator \
-            --chain-id "${BBC_CHAIN_ID}" \
-            --node ${nodeurl} \
-            --home ${workspace}/.local/bc/node${node_dir_index}
+        register_validator_single $i
     done
 }
 
@@ -274,7 +373,7 @@ function start_validator() {
 
 function native_start_single_validator() {
     authority_name="$1"
-    $i= $(get_index ${authorities[@]} ${authority_name})
+    i=$(get_index "${authority_name}" "${authorities[@]}")
     if [ $i -lt 0 ]; then 
         echo "ERROR: validator with name ${authority_name} not found."
         exit 1
@@ -321,6 +420,16 @@ case ${CMD} in
 register)
     echo "===== register ===="
     register_validator
+    echo "===== end ===="
+    ;;
+run_validator)
+    echo "===== run validator ===="
+    run_validator $2
+    echo "===== end ===="
+    ;;
+stop_validator)
+    echo "===== stop validator ===="
+    stop_validator $2
     echo "===== end ===="
     ;;
 generate)
@@ -390,16 +499,6 @@ native_start) # can re-entry
     native_start
     echo "===== start native end ===="
     ;;
-native_start_single)
-    echo "===== start native single ===="
-    native_start_single $2
-    echo "===== start native single end ===="
-    ;;
-native_start_single_validator)
-    echo "===== start native single ===="
-    native_start_single_validator $2
-    echo "===== start native single end ===="
-    ;;
 native_stop)
     echo "===== stop native ===="
     exit_previous
@@ -407,6 +506,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_start_single <i> | native_start_single_validator <validator_name> | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start  | run_validator <validator_name> | stop_validator <validator_name> | native_stop"
     ;;
 esac

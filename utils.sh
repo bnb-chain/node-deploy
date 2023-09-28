@@ -9,9 +9,9 @@ function joinByString() {
 }
 
 # get index in array
-get_index () {
-    local array=("${!1}")
-    local searching=$2
+get_index() {
+    local searching=$1; shift
+    local array=("$@")
     local i
     for i in "${!array[@]}"; do
         if [[ "${array[$i]}" = "${searching}" ]]; then
