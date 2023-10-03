@@ -28,9 +28,25 @@ function stop_validator() {
     ps -ef | grep geth | grep bsc | grep "${authority_name}" | awk '{print $2}' | xargs kill
 }
 
+function stop_node() {
+    i="$1"
+    echo "Stopping node $i"
+    ps -ef | grep geth | grep bsc | grep "node${i}" | awk '{print $2}' | xargs kill
+}
+
 function is_validator_running() {
     authority_name="$1"
     output=$(ps -ef | grep geth | grep bsc | grep "${authority_name}")
+    if [[ -n $output ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+function is_node_running() {
+    i="$1"
+    output=$(ps -ef | grep geth | grep bsc | grep "node${i}")
     if [[ -n $output ]]; then
         return 1
     else
@@ -72,6 +88,55 @@ function run_validator() {
     fi
 }
 
+function run_node() {
+    i="$1"
+    if [ $i -lt 0 ]; then 
+        echo "ERROR: node index should be >- 0"
+        exit 1
+    fi
+    node_folder=${workspace}/.local/bsc/clusterNetwork/node${i}
+     # check if node is already setup
+    if [ ! -d "${node_folder}" ]; then
+        echo "Node $i not yet set up. Setting up..."
+        init_extra_node $i # create and initialize the datadir
+    else
+        echo "Node $i already set up."
+    fi
+
+    # check if node is already running
+    is_node_running $i
+    result=$?
+    if [ $result -eq 1 ]; then 
+        echo "Node ${i} is already up and running."
+        exit 0
+    else 
+        echo "Running node ${i}..."
+    fi
+
+    if [ $i -lt ${node_size} ]; then
+        $(native_start_single_node $i)
+    else
+        $(start_extra_node $i)
+    fi
+
+}
+
+function init_extra_node() {
+    i="$1"
+    node_folder=${workspace}/.local/bsc/clusterNetwork/node${i}
+    mkdir -p ${node_folder}
+    mkdir -p ${node_folder}/bin
+    # copy geth binary
+    cp ${workspace}/bin/geth ${node_folder}/bin/geth
+
+    # copy genesis.json and config.toml
+    cp ${workspace}/genesis/genesis.json ${node_folder}
+    cp ${workspace}/config.toml ${node_folder}
+
+    # init genesis
+    ${node_folder}/bin/geth init --datadir ${node_folder} genesis/genesis.json
+}
+
 
 function init_extra_validator() {
     i="$1"
@@ -89,6 +154,27 @@ function init_extra_validator() {
 
     # init genesis
     ${validator_folder}/bin/geth init --datadir ${validator_folder} genesis/genesis.json
+}
+
+function start_extra_node() {
+    i="$1"
+    HTTPPort=$((9545 + i))
+    WSPort=${HTTPPort}
+    MetricsPort=$((7060 + i))
+    node_folder=${workspace}/.local/bsc/clusterNetwork/node${i}
+    # run extra node
+    # run normal BSC node
+    nohup  ${node_folder}/bin/geth --config ${node_folder}/config.toml \
+        --datadir ${node_folder} \
+        --password ${workspace}/.local/password.txt \
+        --nodekey ${node_folder}/geth/nodekey \
+        --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+        --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+        --gcmode archive --syncmode=full  \
+        --bootnodes "enode://03680e324b74bb9d6ebf37771d02eb9384c3869a1d0c90b595e5a40290345609171987df2ce36134c55613b5562cc5b373405558b9168670d2fa94cab3ca36d0@127.0.0.1:30312,enode://dcaa62f23fc9807a7b9ef479698a306c146738648e525bc7758a41353d150d04e3ba01aebcdcd14376a09a8179d5c1fb0ff83a17b6f6e738e71f5ff64b722656@127.0.0.1:30313" \
+        --port $((40311+${node_size}+ ${validator_size} +$i)) \
+        > ${node_folder}/bsc-node.log 2>&1 &
 }
 
 function start_extra_validator(){
@@ -111,7 +197,7 @@ function start_extra_validator(){
         --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
         --gcmode archive --syncmode=full --mine --vote --monitor.maliciousvote \
         --bootnodes "enode://d9da604d126271999f6724b3e698a852cc1fc77fca0ea5257b1bd9899a7c785624438908f7799bfea398659de9969da592241aa6a77972fe2fa61b5a812c43af@127.0.0.1:30312,enode://3bbefcb9b4a816c0977cc50f42ff066534adbc55fc91e7bcfbc2b4139a483b00251af242e3d46e2caff9f02a437ddba2b5e386a044ae228fea0299dd146063cd@127.0.0.1:30313" \
-        --port $((30311+${node_size} +$i)) \
+        --port $((50311+${node_size} +$i)) \
         > ${validator_folder}/bsc-node.log 2>&1 &
 
 }
@@ -432,6 +518,16 @@ stop_validator)
     stop_validator $2
     echo "===== end ===="
     ;;
+run_node)
+    echo "===== run node ====="
+    run_node $2
+    echo "===== end ======"
+    ;;
+stop_node)
+    echo "===== stop node ====="
+    stop_node $2
+    echo "===== end ======"
+    ;;
 generate)
     echo "===== clean ===="
     clean
@@ -506,6 +602,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start  | run_validator <validator_name> | stop_validator <validator_name> | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start  | run_validator <validator_name> | stop_validator <validator_name> | run_node <node_index> | stop_node <node_index> | native_stop"
     ;;
 esac
