@@ -25,6 +25,7 @@ git clone https://github.com/bnb-chain/node-deploy.git
 2. For the first time, please execute the following command
 ```bash
 git submodule update --init --recursive
+cd genesis && npm install
 ```
 
 3. Make `geth`, `bootnode`, `bnbchaind`, `tbnbcli` binary files, and put them into `bin/` folder.
@@ -51,7 +52,19 @@ cp ./test-crosschain-transfer ../bin/test-crosschain-transfer
 make tool
 ```
 
-5. Configure the cluster
+5. Setup validator keys
+   
+If the validator keys are not setup yet then run:
+```bash
+bash ./setup_keys.sh generate
+```
+
+You can view the keys with:
+```bash
+bash  ./setup_keys.sh view
+```
+
+1. Configure the cluster
    
   You can configure the cluster by modifying the following files:
    - `config.toml` 
