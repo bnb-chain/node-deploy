@@ -2,7 +2,6 @@
 
 basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
-source ${workspace}/.env
 
 
 keys_dir_name="keys" # directory to store all the keys in
@@ -23,6 +22,8 @@ function generate_keys() {
         fee_addr=$(bin/geth account new --datadir ${workspace}/${keys_dir_name}/${authorities[i]}/fee --password ${workspace}/${keys_dir_name}/password.txt)
         # create BLS key
         expect create_bls_key.exp ${workspace}/${keys_dir_name}/${authorities[i]} ${KEYPASS}
+        # create node key
+        openssl rand -hex 32 > ${workspace}/${keys_dir_name}/${authorities[i]}/nodekey
     done
 }
 
@@ -37,7 +38,11 @@ function view_keys() {
             echo "  Fee Address: ${fee_addr}"
             vote_addr=0x$(cat bls/keystore/*json | jq .pubkey | sed 's/"//g')
             echo "  BLS Vote Address: ${vote_addr}"
-            echo 
+            nodekey=$(cat nodekey)
+            echo " Node key : ${nodekey}"
+            enode=$(${workspace}/bin/bootnode -nodekeyhex ${nodekey} -writeaddress)
+            echo "Enode: ${enode}"
+            echo
         done
     else
         echo "${keys_dir_name} directory does not exist"

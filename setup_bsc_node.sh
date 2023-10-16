@@ -312,6 +312,24 @@ function clean() {
     mkdir ${workspace}/.local/bsc/clusterNetwork
 }
 
+function get_init_holders() {
+    local result="${INIT_HOLDER}"
+    # concatenate consensus addresses
+    for ((i=0;i<${validator_size};i++));do
+        cd ${workspace}/${keys_dir_name}/${authorities[i]}
+        cons_addr="0x$(cat consensus/keystore/* | jq -r .address)"
+        # If result already has data, append a comma before adding more
+        if [[ -n $result ]]; then
+            result+=","
+        fi
+
+        result+="$cons_addr"
+        (( i++ ))
+    done
+    echo "$result"
+}
+
+
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
@@ -335,7 +353,8 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     node generate-validator.js
-    node generate-initHolders.js --initHolders ${INIT_HOLDER}
+    init_holders=$(get_init_holders)
+    node generate-initHolders.js --initHolders ${init_holders}
     if [ ${standalone} = false ]; then
         initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
         node generate-genesis.js --chainid ${BSC_CHAIN_ID} --network 'local' --whitelist1Address ${INIT_HOLDER} --initConsensusStateBytes  ${initConsensusStateBytes}
