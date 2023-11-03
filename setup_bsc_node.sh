@@ -100,6 +100,12 @@ function clean() {
     fi
     rm -rf ${workspace}/.local/bsc/clusterNetwork
     mkdir ${workspace}/.local/bsc/clusterNetwork
+    cd  ${workspace}/genesis
+    git stash
+    cd  ${workspace}
+    git submodule update --remote
+    cd  ${workspace}/genesis
+    npm install
 }
 
 function prepare_config() {
