@@ -1,0 +1,104 @@
+version: '3'
+services:
+  erigon:
+    image: bsc_erigon:latest
+    ports:
+      - "6545:8545"
+      - "40311:30311"
+      - "40311:30311/udp"
+      - "7060:6060"
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./bsc-genesis-contract/erigon-genesis.json
+        target: /app/genesis.json
+        read_only: true
+  alice:
+    image: bsc_validator:latest
+    environment:
+     - AUTHORITY_NAME=alice
+    env_file:
+      - .env    
+    ports:
+      - "8545:8545"
+      - "30311:30311"
+      - "30311:30311/udp"
+      - "6060:6060"
+    volumes:
+      - type: bind
+        source: ./keys/password.txt
+        target: /data/keys/password.txt
+      - type: bind
+        source: ./bsc-genesis-contract/genesis.json
+        target: /data/genesis.json
+        read_only: true
+      - ./keys/alice:/data/keys/alice
+  bob:
+    image: bsc_validator:latest
+    environment:
+     - AUTHORITY_NAME=bob
+    env_file:
+      - .env
+    ports:
+      - "8546:8545"
+      - "30312:30311"
+      - "30312:30311/udp"
+    volumes:
+      - type: bind
+        source: ./keys/password.txt
+        target: /data/keys/password.txt
+      - type: bind
+        source: ./bsc-genesis-contract/genesis.json
+        target: /data/genesis.json
+        read_only: true
+      - ./keys/bob:/data/keys/bob
+  charlie:
+    image: bsc_validator:latest
+    environment:
+     - AUTHORITY_NAME=charlie
+    env_file:
+      - .env
+    ports:
+      - "8547:8545"
+      - "30313:30311"
+      - "30313:30311/udp"
+    volumes:
+      - type: bind
+        source: ./keys/password.txt
+        target: /data/keys/password.txt
+      - type: bind
+        source: ./bsc-genesis-contract/genesis.json
+        target: /data/genesis.json
+        read_only: true
+      - ./keys/charlie:/data/keys/charlie
+  dave:
+    image: bsc_validator:latest
+    environment:
+     - AUTHORITY_NAME=dave
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./keys/password.txt
+        target: /data/keys/password.txt
+      - type: bind
+        source: ./bsc-genesis-contract/genesis.json
+        target: /data/genesis.json
+        read_only: true
+      - ./keys/dave:/data/keys/dave
+  eve:
+    image: bsc_validator:latest
+    environment:
+     - AUTHORITY_NAME=eve
+    env_file:
+      - .env
+    volumes:
+      - type: bind
+        source: ./keys/password.txt
+        target: /data/keys/password.txt
+      - type: bind
+        source: ./bsc-genesis-contract/genesis.json
+        target: /data/genesis.json
+        read_only: true
+      - ./keys/eve:/data/keys/eve

@@ -1,0 +1,7 @@
+bsc
+node
+bsc-genesis-contract
+bsc-erigon
+bin
+.DS_Store
+.vscode

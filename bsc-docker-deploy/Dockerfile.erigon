@@ -1,0 +1,34 @@
+# Start from the Go base image
+FROM golang:1.19-alpine
+
+RUN apk add --no-cache make cmake gcc musl-dev linux-headers git bash build-base libc-dev jq
+
+RUN mkdir -p /app/bin 
+
+# Copy Erigon
+COPY ./bsc-erigon /bsc-erigon
+WORKDIR /bsc-erigon
+RUN make erigon
+
+# Copy the binary to a stable location
+RUN cp ./build/bin/erigon /app/bin/erigon
+
+
+WORKDIR /app
+
+EXPOSE 8545 6060 30311 30311/udp
+
+# Run erigon
+
+COPY ./docker_entrypoint_erigon.sh .
+RUN chmod +x /app/docker_entrypoint_erigon.sh
+
+ENTRYPOINT ["/app/docker_entrypoint_erigon.sh"]
+
+
+
+
+
+
+
+

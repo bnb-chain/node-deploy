@@ -1,0 +1,1 @@
+docker build -t bsc_validator:latest  -f Dockerfile.bsc .
