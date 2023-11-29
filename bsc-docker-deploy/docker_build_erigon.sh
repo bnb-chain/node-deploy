@@ -1,0 +1,1 @@
+docker build -t bsc_erigon:latest  -f Dockerfile.erigon .
