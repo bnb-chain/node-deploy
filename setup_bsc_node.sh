@@ -101,9 +101,11 @@ function clean() {
     rm -rf ${workspace}/.local/bsc/clusterNetwork
     mkdir ${workspace}/.local/bsc/clusterNetwork
     cd  ${workspace}/genesis
+    cp ./genesis-template.json ../
     git stash
     cd  ${workspace}
     git submodule update --remote
+    mv ./genesis-template.json ./genesis/
     cd  ${workspace}/genesis
     npm install
 }
