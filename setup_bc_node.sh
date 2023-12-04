@@ -169,7 +169,7 @@ native_start) #only start node0!
         echo "native_start only support one node, please re-init with BBC_CLUSTER_SIZE=1"
         exit
     fi
-    echo "===== stop native node0===="
+    echo "===== stop native node0 ===="
     exit_previous
     sleep 5
     echo "===== stop native node0 end ===="
@@ -180,7 +180,7 @@ native_start) #only start node0!
     echo "===== start native node0 end ===="
     ;;
 native_stop)
-    echo "===== stop native node0===="
+    echo "===== stop native node0 ===="
     exit_previous
     sleep 5
     echo "===== stop native node0 end ===="

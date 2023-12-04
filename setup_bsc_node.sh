@@ -6,16 +6,14 @@ source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
 nodeurl="http://localhost:26657"
 standalone=false
-replaceWhitelabelRelayer="0xA904540818AC9c47f2321F97F1069B9d8746c6DB"
-replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
-stateSchem="hash"
+stateScheme="hash"
 
 function exit_previous() {
 	# stop client
     ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
 }
 
-# need a clean bc without stakings
+# need a clean bc without staking
 function register_validator() {
     sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc
@@ -109,8 +107,10 @@ function clean() {
     cd  ${workspace}
     git submodule update --remote
     mv ./genesis-template.json ./genesis/
-    cd  ${workspace}/genesis
+    cd ${workspace}/genesis
     npm install
+    forge install --no-git --no-commit foundry-rs/forge-std@v1.1.1
+    echo "forge install will fail if already installed, which is not a problem"
 }
 
 function prepare_config() {
@@ -140,27 +140,21 @@ function prepare_config() {
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
 
-    cd ${workspace}/genesis/scripts
-    sed -i -e "s/'0x' + publicKey.pop()/vs[4]/g" generate-validator.js
-    node generate-validator.js
-    node generate-initHolders.js --initHolders ${INIT_HOLDER}
-    sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" generate-relayerHub.sh
+    cd ${workspace}/genesis/
+    git checkout HEAD contracts
+    node scripts/generate-validator.js
+    node scripts/generate-initHolders.js --initHolders ${INIT_HOLDER}
     if [ ${standalone} = false ]; then
         initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
-        sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" generate.sh
+        bash scripts/generate.sh local --chainId ${BSC_CHAIN_ID} --whitelist1Address ${INIT_HOLDER} --initConsensusStateBytes ${initConsensusStateBytes}
+    else
+        bash scripts/generate.sh local --chainId ${BSC_CHAIN_ID} --whitelist1Address ${INIT_HOLDER}
     fi
-    cd ${workspace}/genesis
-    git checkout HEAD contracts
-    forge install --no-git --no-commit foundry-rs/forge-std@v1.1.1
-    echo "forge installed error, no matters"
-    bash flatten.sh
-    # use 714 as `chainId` by default
-    bash scripts/generate.sh local
 }
 
 function initNetwork_k8s() {
-   cd ${workspace}
-   ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.ips=${ips_string} --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    cd ${workspace}
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.ips=${ips_string} --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     for ((i=0;i<${size};i++));do
         staticPeers=$(generate_static_peers ${size} ${i})
         line=`grep -n -e 'StaticNodes' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml | cut -d : -f 1`
@@ -170,13 +164,16 @@ function initNetwork_k8s() {
         rm -f ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
         mv ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml-e ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
     done
-   rm -rf  ${workspace}/*bsc.log*
+    rm -rf  ${workspace}/*bsc.log*
 }
 
 function initNetwork() {
     cd ${workspace}
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     rm -rf  ${workspace}/*bsc.log*
+    for ((i=0;i<${size};i++));do
+        sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml
+    done
 }
 
 function prepare_k8s_config() {
@@ -234,7 +231,7 @@ function native_start() {
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
         # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateScheme} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
@@ -244,7 +241,7 @@ function native_start() {
                             -unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-                            --gcmode archive --syncmode=full --state.scheme ${stateSchem} --mine --vote --monitor.maliciousvote \
+                            --gcmode archive --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }

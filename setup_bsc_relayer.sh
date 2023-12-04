@@ -93,7 +93,7 @@ native_start)
     echo "===== start native node0 end ===="
     ;;
 native_stop)
-    echo "===== stop native node0===="
+    echo "===== stop native node0 ===="
     exit_previous
     sleep 5
     echo "===== stop native node0 end ===="
