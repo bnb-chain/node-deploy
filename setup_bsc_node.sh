@@ -151,8 +151,9 @@ function prepare_config() {
         sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" generate.sh
     fi
     
-    rm ${workspace}/genesis/lib/forge-std
-    forge install --no-git --no-commit foundry-rs/forge-std@v1.1.1
+    if [ ! -d "${workspace}/genesis/lib/forge-std" ];then
+        forge install --no-git --no-commit foundry-rs/forge-std@v1.1.1
+    fi 
 
     cd ${workspace}/genesis
     # use 714 as `chainId` by default
