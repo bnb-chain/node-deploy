@@ -235,8 +235,8 @@ function native_start() {
         MetricsPort=$((6060 + i))
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
-        # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        # init genesis and update chain config
+        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} ${workspace}/.local/bsc/clusterNetwork/node${i}/genesis.json
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
