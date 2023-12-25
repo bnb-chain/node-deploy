@@ -137,6 +137,13 @@ curl -X POST "http://localhost:8545" -H "Content-Type: application/json"  --data
 
 ## Additional Commands
 
+#### Background transactions
+```bash
+cd txbot
+go build
+./air-drops
+```
+
 #### Remove all nodes
 ```bash
 bash +x ./setup_bc_node.sh uninstall_k8s
@@ -163,7 +170,7 @@ bash +x ./stop_cluster.sh
 
 ```bash
 # one cmd to start bsc cluster all alone
-bash +x ./setup_bsc_node.sh native_run_alone
+bash +x ./setup_bsc_node.sh native_start_alone
 ```
 #### Upgrade image
 ```bash

@@ -156,6 +156,10 @@ function prepare_config() {
     fi 
 
     cd ${workspace}/genesis
+    hardforkTime=`expr $(date +%s) + ${HARD_FORK_DELAY}`
+    echo "hardforkTime "${hardforkTime} >${workspace}/.local/bsc/hardforkTime.txt
+    sed -i -e '/shanghaiTime/d' ./genesis-template.json
+    sed -i -e '/keplerTime/d' ./genesis-template.json
     # use 714 as `chainId` by default
     bash scripts/generate.sh local
 }
@@ -224,6 +228,7 @@ function uninstall_k8s() {
 }
 
 function native_start() {
+    hardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
     for ((i=0;i<${size};i++));do
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
@@ -235,8 +240,13 @@ function native_start() {
         MetricsPort=$((6060 + i))
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i}
-        # init genesis
-        ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json
+        
+        initLog=${workspace}/.local/bsc/clusterNetwork/node${i}/init.log
+        if [ ! -f "$initLog" ]; then
+            # init genesis
+            ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json >${initLog} 2>&1
+        fi
+        rialtoHash=`cat ${initLog}|grep "lightchaindata    hash="|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
@@ -247,6 +257,7 @@ function native_start() {
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
                             --gcmode archive --syncmode=full --state.scheme ${stateSchem} --mine --vote --monitor.maliciousvote \
+                            --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }
@@ -300,7 +311,7 @@ native_init)
     initNetwork
     echo "===== end ===="
     ;;
-native_run_alone)
+native_start_alone)
     standalone=true
     echo "===== register ===="
     register_validator
@@ -332,6 +343,6 @@ native_stop)
     echo "===== stop native end ===="
     ;;
 *)
-    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_run_alone | native_start | native_stop"
+    echo "Usage: setup_bsc_node.sh register | generate | generate_k8s | clean | install_k8s | uninstall_k8s | native_init | native_start_alone | native_start | native_stop"
     ;;
 esac
