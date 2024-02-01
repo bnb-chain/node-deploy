@@ -3,9 +3,10 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
-size=$((${BSC_CLUSTER_SIZE}))
-nodeurl="http://localhost:26657"
-standalone=false
+validatorSize=$((BSC_CLUSTER_SIZE))
+builderSize=$((BUILDER_SIZE))
+nodeUrl="http://localhost:26657"
+standalone=true
 replaceWhitelabelRelayer="0xA904540818AC9c47f2321F97F1069B9d8746c6DB"
 replaceConsensusStateBytes="42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000"
 stateSchem="hash"
@@ -20,7 +21,7 @@ function register_validator() {
     sleep 15 #wait for bc setup and all BEPs enabled, otherwise may node-delegator not inclued in state
     rm -rf ${workspace}/.local/bsc
 
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         mkdir -p ${workspace}/.local/bsc/validator${i}
         echo "${KEYPASS}" > ${workspace}/.local/bsc/password.txt
         
@@ -42,7 +43,7 @@ function register_validator() {
         delegator=$(${workspace}/bin/tbnbcli keys list --home ${workspace}/.local/bc/node${node_dir_index} | grep node${i}-delegator | awk -F" " '{print $3}')
         if [ "$i" != "0" ]; then
             sleep 6 #wait for including tx in block
-            echo "${KEYPASS}" | ${workspace}/bin/tbnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeurl} --home ${workspace}/.local/bc/node0
+            echo "${KEYPASS}" | ${workspace}/bin/tbnbcli send --from node0-delegator --to $delegator --amount 5000000000000:BNB --chain-id ${BBC_CHAIN_ID} --node ${nodeUrl} --home ${workspace}/.local/bc/node0
         fi
         sleep 6 #wait for including tx in block
         echo ${delegator} "balance"
@@ -64,7 +65,7 @@ function register_validator() {
             --identity "${delegator}" \
             --from node${i}-delegator \
             --chain-id "${BBC_CHAIN_ID}" \
-            --node ${nodeurl} \
+            --node ${nodeUrl} \
             --home ${workspace}/.local/bc/node${node_dir_index}
     done
 }
@@ -105,19 +106,19 @@ function clean() {
     mkdir ${workspace}/.local/bsc/clusterNetwork
 
     cd  ${workspace}/genesis
-    cp ./genesis-template.json ../
+#    cp ./genesis-template.json ../
     git stash
-    cd  ${workspace}
-    git submodule update --remote
-    mv ./genesis-template.json ./genesis/
-    cd  ${workspace}/genesis
-    npm install
+#    cd  ${workspace}
+#    git submodule update --remote
+#    mv ./genesis-template.json ./genesis/
+#    cd  ${workspace}/genesis
+#    npm install
 }
 
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*;do
             cons_addr="0x$(cat ${f} | jq -r .address)"
         done
@@ -130,8 +131,8 @@ function prepare_config() {
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
         if [ ${standalone} = false ]; then
-            bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
-            powers=`${workspace}/bin/tbnbcli staking side-top-validators ${size} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeurl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
+            bbcfee_addrs=`${workspace}/bin/tbnbcli staking side-top-validators ${validatorSize} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeUrl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].distribution_addr" |xargs ${workspace}/bin/tool -network-type 0 -addr`
+            powers=`${workspace}/bin/tbnbcli staking side-top-validators ${validatorSize} --side-chain-id=${BSC_CHAIN_NAME} --node="${nodeUrl}" --chain-id=${BBC_CHAIN_ID} --trust-node --output=json| jq -r ".[${i}].tokens" |xargs ${workspace}/bin/tool -network-type 0 -power`
         fi
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/clusterNetwork/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
         vote_addr=0x$(cat ${workspace}/.local/bsc/clusterNetwork/node${i}/bls/keystore/*json| jq .pubkey | sed 's/"//g')
@@ -141,13 +142,18 @@ function prepare_config() {
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
 
+    for ((i=0;i<${builderSize};i++));do
+        cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/builder${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
+        echo "builder" ${i} ":" ${cons_addr}
+    done
+
     cd ${workspace}/genesis/scripts
     sed -i -e "s/'0x' + publicKey.pop()/vs[4]/g" generate-validator.js
     node generate-validator.js
     node generate-initHolders.js --initHolders ${INIT_HOLDER}
     sed -i -e "s/${replaceWhitelabelRelayer}/${INIT_HOLDER}/g" generate-relayerHub.sh
     if [ ${standalone} = false ]; then
-        initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeurl} -network-type 0)
+        initConsensusStateBytes=$(${workspace}/bin/tool -height 1 -rpc ${nodeUrl} -network-type 0)
         sed -i -e "s/${replaceConsensusStateBytes}/${initConsensusStateBytes}/g" generate.sh
     fi
     
@@ -166,9 +172,9 @@ function prepare_config() {
 
 function initNetwork_k8s() {
    cd ${workspace}
-   ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.ips=${ips_string} --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    for ((i=0;i<${size};i++));do
-        staticPeers=$(generate_static_peers ${size} ${i})
+   ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.ips=${ips_string} --init.size=${validatorSize} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    for ((i=0;i<${validatorSize};i++));do
+        staticPeers=$(generate_static_peers ${validatorSize} ${i})
         line=`grep -n -e 'StaticNodes' ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml | cut -d : -f 1`
         head -n $((line-1)) ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml >> ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml-e
         echo "StaticNodes = [${staticPeers}]" >> ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml-e
@@ -181,16 +187,15 @@ function initNetwork_k8s() {
 
 function initNetwork() {
     cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    rm -rf  ${workspace}/*bsc.log*
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=$((validatorSize+builderSize)) --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
 }
 
 function prepare_k8s_config() {
     kubectl create ns bsc
 
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         kubectl delete secret keystore${i} -n bsc
-        files="" 
+        files=""
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*;do
          files="$files --from-file=$f"
         done
@@ -203,33 +208,33 @@ function prepare_k8s_config() {
         kubectl delete configmap config${i} -n bsc
         kubectl create configmap config${i} -n bsc \
          --from-file ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
-         --from-file ${workspace}/genesis/genesis.json 
+         --from-file ${workspace}/genesis/genesis.json
 
         kubectl delete configmap nodekey${i} -n bsc
         kubectl create configmap nodekey${i} -n bsc \
          --from-file ${workspace}/.local/bsc/clusterNetwork/node${i}/geth/nodekey
     done
-    
+
 }
 
 function install_k8s() {
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         helm install bsc-node-${i} \
          --namespace bsc --create-namespace \
          --set-string configName=config${i},secretName=keystore${i},nodeKeyCfgName=nodekey${i} \
-         ${workspace}/helm/bsc 
+         ${workspace}/helm/bsc
     done
 }
 
 function uninstall_k8s() {
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         helm uninstall bsc-node-${i} --namespace bsc
     done
 }
 
 function native_start() {
     hardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
-    for ((i=0;i<${size};i++));do
+    for ((i=0;i<${validatorSize};i++));do
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
             cons_addr="0x$(cat ${j} | jq -r .address)"
@@ -259,6 +264,37 @@ function native_start() {
                             --gcmode archive --syncmode=full --state.scheme ${stateSchem} --mine --vote --monitor.maliciousvote \
                             --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+    done
+
+    for ((i=0;i<${builderSize};i++));do
+        cp -R ${workspace}/.local/bsc/builder${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))
+        for j in ${workspace}/.local/bsc/builder${i}/keystore/*;do
+            cons_addr="0x$(cat ${j} | jq -r .address)"
+        done
+
+        HTTPPort=$((8545 + i + validatorSize))
+        WSPort=${HTTPPort}
+        MetricsPort=$((6060 + i + validatorSize))
+
+        cp ${workspace}/bin/geth_builder ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/geth_builder$((i+validatorSize))
+
+        initLog=${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/init.log
+        if [ ! -f "$initLog" ]; then
+            # init genesis
+            ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/geth_builder$((i+validatorSize)) init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize)) genesis/genesis.json >${initLog} 2>&1
+        fi
+        rialtoHash=`cat ${initLog}|grep "lightchaindata    hash="|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+        # run BSC node
+        nohup  ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/geth_builder$((i+validatorSize)) --config ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/config.toml \
+                            --datadir ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize)) \
+                            --password ${workspace}/.local/bsc/password.txt \
+                            --nodekey ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/geth/nodekey \
+                            -unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+                            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+                            --gcmode archive --syncmode=full --state.scheme ${stateSchem} \
+                            --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} \
+                            > ${workspace}/.local/bsc/clusterNetwork/node$((i+validatorSize))/bsc-node.log 2>&1 &
     done
 }
 
