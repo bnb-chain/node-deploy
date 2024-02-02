@@ -246,7 +246,7 @@ function native_start() {
             # init genesis
             ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} init --state.scheme ${stateSchem} --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} genesis/genesis.json >${initLog} 2>&1
         fi
-        rialtoHash=`cat ${initLog}|grep "lightchaindata    hash="|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+        rialtoHash=`cat ${initLog}|grep "database=lightchaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
         # run BSC node
         nohup  ${workspace}/.local/bsc/clusterNetwork/node${i}/geth${i} --config ${workspace}/.local/bsc/clusterNetwork/node${i}/config.toml \
                             --datadir ${workspace}/.local/bsc/clusterNetwork/node${i} \
