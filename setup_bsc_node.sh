@@ -103,6 +103,11 @@ function clean() {
     mkdir ${workspace}/.local/bsc/clusterNetwork
 
     cd ${workspace}/genesis
+    cp genesis-template.json genesis-template.json.bk
+    git stash
+    cd  ${workspace} && git submodule update --remote && cd ${workspace}/genesis
+    mv genesis-template.json.bk genesis-template.json
+    
     poetry install --no-root
     npm install
     rm -rf ${workspace}/genesis/lib/forge-std
