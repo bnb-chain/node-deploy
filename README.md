@@ -43,8 +43,8 @@ cp ./build/bin/bootnode ../bin/bootnode
 ```
 
 4. Configure the cluster
-   
   You can configure the cluster by modifying the following files:
+   - `config.toml`
    - `genesis/genesis-template.json`
    - `.env`
 
@@ -52,24 +52,22 @@ cp ./build/bin/bootnode ../bin/bootnode
 two different ways, choose as you like.
 
 **On Kubernetes environment**
-
 ```bash
 #on k8s environment
 minikube start
-
-bash +x ./start_cluster.sh generate
-bash +x ./start_cluster.sh install_k8s
+bash -x ./start_cluster.sh install_k8s
 kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 ```
 
 **Natively**
 ```bash
 #native deploy without docker
-bash +x ./start_cluster.sh start 
+bash -x ./start_cluster.sh reset # will reset the cluster and start
+bash -x ./start_cluster.sh stop  # only stop the cluster
+bash -x ./start_cluster.sh start # only start the cluster
 ```
 
 ## Background transactions
-
 ```bash
 cd txbot
 go build
