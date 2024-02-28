@@ -7,10 +7,13 @@ Before proceeding to the next steps, please ensure that the following packages a
 - nodejs: 12.18.3 
 - npm: 6.14.6
 - go: 1.18+
+- python: 3.8+
 - expect
 - foundry
 - jq
-If you would setup nodes on k8s environment, the following packages and softwares are neccessary:
+- poetry
+
+If you would setup nodes on k8s environment, the following packages and softwares are necessary:
 - helm: 3.9.4
 - minikube: 1.29.0
 - docker: 20.10.22
@@ -112,27 +115,15 @@ bash +x ./start_cluster.sh
 ```bash
 ## 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791 is the address used by test-crosschain-transfer as sender
 ## macos
-echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date -v+300S +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from node0-delegator --chain-id Binance-Chain-Ganges --node localhost:26657 --home ./.local/bc/node0
+echo "1234567890" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date -v+300S +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from node0-delegator --chain-id Binance-Chain-Ganges --node localhost:26657 --home ./.local/bc/node0
 
 ## linux
-echo "12345678" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from local-user --chain-id Binance-Chain-Ganges --node localhost:26657
+echo "1234567890" | ./bin/tbnbcli bridge transfer-out --amount 500000000:BNB --expire-time $(date --date="+300 seconds" +%s) --to 0x9fB29AAc15b9A4B7F17c3385939b007540f4d791  --from local-user --chain-id Binance-Chain-Ganges --node localhost:26657
 ```
 
 8. Check the account balance
 ```
 curl -X POST "http://localhost:8545" -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"eth_getBalance","params":["0x9fB29AAc15b9A4B7F17c3385939b007540f4d791", "latest"],"id":1}' 
-```
-
-8. Execute cross chain transaction by sending BNB from BSC to BC
-```
-
-./bin/test-crosschain-transfer --amount 1 --rpc-url http://localhost:8545 --to 0x0cdce3d8d17c0553270064cee95c73f17534d5a0
-```
-
-9. Check the account balance
-``` bash
-## The bech32 format of 0x0cdce3d8d17c0553270064cee95c73f17534d5a0 is tbnb1pnww8kx30sz4xfcqvn8wjhrn796nf4dqshlvlg.(you can use this tool https://slowli.github.io/bech32-buffer/ to do the convert)  
-./bin/tbnbcli account tbnb1pnww8kx30sz4xfcqvn8wjhrn796nf4dqshlvlg --chain-id Binance-Chain-Ganges --node localhost:26657 --trust-node
 ```
 
 ## Additional Commands
