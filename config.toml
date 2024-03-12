@@ -20,12 +20,12 @@ Recommit = 10000000000
 
 [Eth.Miner.Mev]
 Enabled = true
-SentryURL = "http://localhost:3000"
 ValidatorCommission = 100
 BidSimulationLeftOver = 50000000
 
 [[Eth.Miner.Mev.Builders]]
-Address = "0x837060bd423eFcDd5B7b6B92aB3CFc74B9CD0df4"
+Address = "0x23707D3D71E31e4Cb5B4A9816DfBDCA6455B52B3"
+URL = "http://localhost:8548"
 
 [Eth.TxPool]
 Locals = []

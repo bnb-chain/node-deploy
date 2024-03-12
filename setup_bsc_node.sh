@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
+set -ex
 basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/utils.sh
 size=$((${BSC_CLUSTER_SIZE}))
+builderSize=$((BUILDER_SIZE))
 nodeurl="http://localhost:26657"
-standalone=false
+standalone=true
 stateScheme="hash"
 
 function exit_previous() {
@@ -141,6 +143,11 @@ function prepare_config() {
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
 
+    for ((i=0;i<${builderSize};i++));do
+        cons_addr=$(${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/builder${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}')
+        echo "builder" ${i} ":" ${cons_addr}
+    done
+
     cd ${workspace}/genesis
     git checkout HEAD contracts
     poetry run python -m scripts.generate generate-validators
@@ -206,7 +213,7 @@ function initNetwork_k8s() {
 
 function initNetwork() {
     cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc/clusterNetwork --init.size=$((size+builderSize)) --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     rm -rf  ${workspace}/*bsc.log*
 }
 
@@ -284,6 +291,37 @@ function native_start() {
                             --gcmode archive --syncmode=full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
                             --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} --override.feynman ${hardforkTime} \
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
+    done
+
+    for ((i=0;i<${builderSize};i++));do
+        cp -R ${workspace}/.local/bsc/builder${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node$((i+size))
+        for j in ${workspace}/.local/bsc/builder${i}/keystore/*;do
+            cons_addr="0x$(cat ${j} | jq -r .address)"
+        done
+
+        HTTPPort=$((8545 + i + size))
+        WSPort=${HTTPPort}
+        MetricsPort=$((6060 + i + size))
+
+        cp ${workspace}/bin/geth_builder ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/geth_builder$((i+size))
+
+        initLog=${workspace}/.local/bsc/clusterNetwork/node$((i+size))/init.log
+        if [ ! -f "$initLog" ]; then
+            # init genesis
+            ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/geth_builder$((i+size)) init --datadir ${workspace}/.local/bsc/clusterNetwork/node$((i+size)) genesis/genesis.json >${initLog} 2>&1
+        fi
+#        rialtoHash=`cat ${initLog}|grep "lightchaindata    hash="|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+        # run BSC node
+        nohup  ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/geth_builder$((i+size)) --config ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/config.toml \
+                            --datadir ${workspace}/.local/bsc/clusterNetwork/node$((i+size)) \
+                            --password ${workspace}/.local/bsc/password.txt \
+                            --nodekey ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/geth/nodekey \
+                            -unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+                            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+                            --gcmode archive --syncmode=full --state.scheme ${stateScheme} --mine \
+                            --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} --override.feynman ${hardforkTime} \
+                            > ${workspace}/.local/bsc/clusterNetwork/node$((i+size))/bsc-node.log 2>&1 &
     done
 }
 
