@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/holiman/uint256"
 )
 
@@ -26,9 +26,9 @@ var account, _ = fromHexKey("59ba8068eb256d520179e903f43dacf6d8d57d72bd306e1bd60
 var toAddr = common.HexToAddress("0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186")
 
 var (
-    emptyBlob          = kzg4844.Blob{}
-    emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
-    emptyBlobProof, _  = kzg4844.ComputeBlobProof(emptyBlob, emptyBlobCommit)
+	emptyBlob          = kzg4844.Blob{}
+	emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
+	emptyBlobProof, _  = kzg4844.ComputeBlobProof(emptyBlob, emptyBlobCommit)
 )
 
 func main() {
@@ -42,8 +42,7 @@ func main() {
 				fmt.Println(err)
 				continue
 			}
-			// hash, err := sendEther(c, account, toAddr, big.NewInt(1), nonce)
-			hash, err := sendBlobs(c, account, toAddr, uint256.NewInt(1), nonce, account.Key,true)
+			hash, err := sendBlobs(c, account, toAddr, uint256.NewInt(1), nonce, true)
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -58,29 +57,9 @@ type ExtAcc struct {
 	addr common.Address
 }
 
-func sendEther(client *ethclient.Client, fromEO ExtAcc, toAddr common.Address, value *big.Int, nonce uint64) (common.Hash, error) {
-	gasLimit := uint64(3e4)
-	gasPrice := big.NewInt(params.GWei * 10)
+func sendBlobs(client *ethclient.Client, fromEO ExtAcc, toAddr common.Address, value *uint256.Int, nonce uint64, withSidecar bool) (common.Hash, error) {
+	tx := createEmptyBlobTx(fromEO.Key, withSidecar, toAddr, value, nonce)
 
-	tx := types.NewTransaction(nonce, toAddr, value, gasLimit, gasPrice, nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainId), fromEO.Key)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	txhash := signedTx.Hash()
-	return txhash, nil
-}
-
-func sendBlobs(client *ethclient.Client, fromEO ExtAcc, toAddr common.Address, value *uint256.Int, nonce uint64, key *ecdsa.PrivateKey, withSidecar bool) (common.Hash, error) {
-	// gasLimit := uint64(3e4)
-	// gasPrice := big.NewInt(params.GWei * 10)
-
-	tx := createEmptyBlobTx(key, withSidecar, toAddr, value, nonce )
-	
 	err := client.SendTransaction(context.Background(), tx)
 	if err != nil {
 		return common.Hash{}, err
@@ -88,8 +67,6 @@ func sendBlobs(client *ethclient.Client, fromEO ExtAcc, toAddr common.Address, v
 	txhash := tx.Hash()
 	return txhash, nil
 }
-
-
 
 func fromHexKey(hexkey string) (ExtAcc, error) {
 	key, err := crypto.HexToECDSA(hexkey)
@@ -115,13 +92,13 @@ func createEmptyBlobTx(key *ecdsa.PrivateKey, withSidecar bool, toAddr common.Ad
 	blobtx := &types.BlobTx{
 		ChainID:    uint256.NewInt(714),
 		Nonce:      nonce,
-		GasTipCap:  uint256.NewInt(10000000000),
-		GasFeeCap:  uint256.NewInt(20000000000),
+		GasTipCap:  uint256.NewInt(10 * params.GWei),
+		GasFeeCap:  uint256.NewInt(10 * params.GWei),
 		Gas:        25000,
 		To:         toAddr,
 		Value:      value,
-		Data:       make([]byte, 50),
-		BlobFeeCap: uint256.NewInt(15),
+		Data:       nil,
+		BlobFeeCap: uint256.NewInt(3 * params.GWei),
 		BlobHashes: sidecar.BlobHashes(),
 	}
 	if withSidecar {

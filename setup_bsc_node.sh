@@ -148,8 +148,6 @@ function prepare_config() {
 
     hardforkTime=`expr $(date +%s) + ${HARD_FORK_DELAY}`
     echo "hardforkTime "${hardforkTime} >${workspace}/.local/bsc/hardforkTime.txt
-    sed -i -e '/shanghaiTime/d' ./genesis-template.json
-    sed -i -e '/keplerTime/d' ./genesis-template.json
     sed -i -e '/feynmanTime/d' ./genesis-template.json
 
     # use 714 as `chainId` by default
@@ -253,7 +251,8 @@ function uninstall_k8s() {
 }
 
 function native_start() {
-    hardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    FeynmanHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    CancunHardforkTime=`expr ${FeynmanHardforkTime} + 10`
     for ((i=0;i<${size};i++));do
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/clusterNetwork/node${i}
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
@@ -282,7 +281,7 @@ function native_start() {
                             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
                             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
                             --gcmode archive --syncmode=full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
-                            --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} --override.feynman ${hardforkTime} \
+                            --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime}\
                             > ${workspace}/.local/bsc/clusterNetwork/node${i}/bsc-node.log 2>&1 &
     done
 }

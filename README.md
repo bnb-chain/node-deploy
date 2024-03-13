@@ -130,9 +130,15 @@ curl -X POST "http://localhost:8545" -H "Content-Type: application/json"  --data
 
 #### Background transactions
 ```bash
+## normal tx
 cd txbot
 go build
 ./air-drops
+
+## blob tx
+cd txblob
+go build
+./txblob
 ```
 
 #### Remove all nodes
