@@ -1,15 +1,17 @@
-## Deployment tools of BC-BSC
+# Deployment tools of BSC
+
 
 ## Installation
-
-Before proceeding to the next steps, please ensure that the following packages and software are well installed in your local machine: 
+Before proceeding to the next steps, please ensure that the following packages and softwares are well installed in your local machine: 
+- nodejs: 12.18.3 
+- npm: 6.14.6
+- go: 1.18+
 - foundry
 - python3
-- nodejs
-- expect
+- poetry
 - jq
 
-If you are going to set up nodes on k8s environment, the following packages and software are necessary:
+If you would setup nodes on k8s environment, the following packages and softwares are necessary:
 - helm: 3.9.4
 - minikube: 1.29.0
 - docker: 20.10.22
@@ -43,23 +45,15 @@ cp ./build/bin/bootnode ../bin/bootnode
 ```
 
 4. Configure the cluster
+```
   You can configure the cluster by modifying the following files:
    - `config.toml`
    - `genesis/genesis-template.json`
    - `.env`
+```
 
 5. Setup all nodes.
 two different ways, choose as you like.
-
-**On Kubernetes environment**
-```bash
-#on k8s environment
-minikube start
-bash -x ./start_cluster.sh install_k8s
-kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
-```
-
-**Natively**
 ```bash
 #native deploy without docker
 bash -x ./start_cluster.sh reset # will reset the cluster and start
@@ -67,9 +61,23 @@ bash -x ./start_cluster.sh stop  # only stop the cluster
 bash -x ./start_cluster.sh start # only start the cluster
 ```
 
+```bash
+#on k8s environment
+minikube start
+bash -x ./start_cluster.sh install_k8s
+kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
+```
+
+
 ## Background transactions
 ```bash
+## normal tx
 cd txbot
 go build
 ./air-drops
+
+## blob tx
+cd txblob
+go build
+./txblob
 ```

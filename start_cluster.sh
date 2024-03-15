@@ -7,6 +7,8 @@ workspace=${basedir}
 source "${workspace}"/.env
 size=$((BSC_CLUSTER_SIZE))
 stateScheme="hash"
+epoch=200
+blockInterval=3
 
 # stop geth client
 function exit_previous() {
@@ -57,13 +59,15 @@ function generate_static_peers() {
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
     cd  ${workspace}/genesis
-    cp ./genesis-template.json ../
+    cp genesis-template.json genesis-template.json.bk
     git stash
-    cd  ${workspace}
-    git submodule update --remote
-    mv ./genesis-template.json ./genesis/
-    cd  ${workspace}/genesis
+    cd ${workspace} && git submodule update --remote && cd ${workspace}/genesis
+    mv genesis-template.json.bk genesis-template.json
+    
+    poetry install --no-root
     npm install
+    rm -rf ${workspace}/genesis/lib/forge-std
+    forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
 }
 
 function prepare_config() {
@@ -90,25 +94,19 @@ function prepare_config() {
     done
 
     cd "${workspace}"/genesis/
-    git checkout HEAD contracts
-
-    if [ ! -d "${workspace}/genesis/lib/forge-std" ];then
-        forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
-    fi
 
     hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
     echo "hardforkTime "${hardforkTime} > "${workspace}"/.local/bsc/hardforkTime.txt
-    sed -i -e '/shanghaiTime/d' ./genesis-template.json
-    sed -i -e '/keplerTime/d' ./genesis-template.json
     sed -i -e '/feynmanTime/d' ./genesis-template.json
 
+    git checkout HEAD contracts
     python3 scripts/generate.py generate-validators
     python3 scripts/generate.py generate-init-holders "${INIT_HOLDER}"
     python3 scripts/generate.py dev --dev-chain-id "${BSC_CHAIN_ID}" --whitelist-1 "${INIT_HOLDER}" \
-      --epoch "20" --misdemeanor-threshold "5" --felony-threshold "10" \
+      --epoch "${epoch}" --misdemeanor-threshold "5" --felony-threshold "10" \
       --init-felony-slash-scope "60" \
       --breathe-block-interval "1 minutes" \
-      --block-interval "1" \
+      --block-interval "${blockInterval}" \
       --init-bc-consensus-addresses 'hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb9226600000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000003c44cdddb6a900fa2b585dd299e03d12fa4293bc"' \
       --init-bc-vote-addresses 'hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000030b86b3146bdd2200b1dbdb1cea5e40d3451c028cbb4fb03b1826f7f2d82bee76bbd5cd68a74a16a7eceea093fd5826b9200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003087ce273bb9b51fd69e50de7a8d9a99cfb3b1a5c6a7b85f6673d137a5a2ce7df3d6ee4e6d579a142d58b0606c4a7a1c27000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030a33ac14980d85c0d154c5909ebf7a11d455f54beb4d5d0dc1d8b3670b9c4a6b6c450ee3d623ecc48026f09ed1f0b5c1200000000000000000000000000000000"' \
       --stake-hub-protector "${INIT_HOLDER}" \
@@ -197,7 +195,8 @@ function uninstall_k8s() {
 }
 
 function native_start() {
-    hardforkTime=$(cat "${workspace}"/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}')
+    FeynmanHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    CancunHardforkTime=`expr ${FeynmanHardforkTime} + 10`
     for ((i = 0; i < size; i++));do
         for j in "${workspace}"/.local/bsc/validator${i}/keystore/*;do
             cons_addr="0x$(cat ${j} | jq -r .address)"
@@ -223,8 +222,7 @@ function native_start() {
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode archive --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.shanghai ${hardforkTime} --override.kepler ${hardforkTime} \
-            --override.feynman ${hardforkTime} \
+            --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
             > "${workspace}"/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
 }
