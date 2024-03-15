@@ -27,11 +27,6 @@ git clone https://github.com/bnb-chain/node-deploy.git
 2. For the first time, please execute the following command
 ```bash
 pip3 install -r requirements.txt
-
-git submodule update --init --recursive
-cd genesis
-npm install
-forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
 ```
 
 3. Make `geth`, `bootnode` binary files, and put them into `bin/` folder.
@@ -59,6 +54,7 @@ two different ways, choose as you like.
 bash -x ./start_cluster.sh reset # will reset the cluster and start
 bash -x ./start_cluster.sh stop  # only stop the cluster
 bash -x ./start_cluster.sh start # only start the cluster
+bash -x ./start_cluster.sh restart # start the cluster after stopping it
 ```
 
 ```bash
