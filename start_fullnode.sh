@@ -8,7 +8,7 @@ syncmode="full"
 gcmode="full"
 index=0
 
-src=${workspace}/.local/bsc/clusterNetwork/node0
+src=${workspace}/.local/bsc/node0
 if [ ! -d "$src" ] ;then
 	echo "you must startup validator firstly..."
 	exit 1
