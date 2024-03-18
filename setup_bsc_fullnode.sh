@@ -79,7 +79,7 @@ clean)
     clean
     ;;
 *)
-    echo "Usage: run_fullnode.sh start|stop|clean nodeIndex syncmode"
-    echo "like: run_fullnode.sh start 1 snap, it will startup a snapsync node1"
+    echo "Usage: setup_bsc_fullnode.sh start|stop|clean nodeIndex syncmode"
+    echo "like: setup_bsc_fullnode.sh start 1 snap, it will startup a snapsync node1"
     ;;
 esac
