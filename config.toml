@@ -38,7 +38,7 @@ NoUSB = true
 InsecureUnlockAllowed = true
 HTTPPort = 8545
 HTTPVirtualHosts = ["*"]
-HTTPModules = ["eth", "net", "web3", "txpool", "parlia" ,"debug"]
+HTTPModules = ["eth", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
 
