@@ -64,6 +64,20 @@ bash -x ./start_cluster.sh install_k8s
 kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 ```
 
+6. Setup a full node.
+
+If you want to run a full node to test snap/full syncing, you can run:
+
+> Attention: it relies on the validator cluster, so you should set up validators by `start_cluster.sh` first.
+
+```bash
+# start a full sync node
+bash +x ./start_fullnode.sh 0 full
+# start a snap sync node
+bash +x ./start_fullnode.sh 1 snap
+```
+
+You can see the logs in `.local/bsc/fullnode`.
 
 ## Background transactions
 ```bash
