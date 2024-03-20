@@ -39,7 +39,9 @@ function start() {
   --ws.addr 0.0.0.0 --ws.port $(( 8600 + $index )) --http.addr 0.0.0.0 --http.port $(( 8600 + $index )) --http.corsdomain "*" \
   --metrics --metrics.addr 0.0.0.0 --metrics.port $(( 6100 + $index )) --metrics.expensive \
   --gcmode $gcmode --syncmode $syncmode --state.scheme ${stateScheme} \
-  --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} > $dst/bsc-node.log 2>&1 &
+  --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
+  --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+  > $dst/bsc-node.log 2>&1 &
   echo $! > $dst/pid
 }
 
