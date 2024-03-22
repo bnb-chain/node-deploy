@@ -124,6 +124,7 @@ function native_start() {
         MetricsPort=$((6060 + i))
  
         # geth may be replaced
+        rm -f ${workspace}/.local/bsc/node${i}/geth${i}
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
 
         initLog=${workspace}/.local/bsc/node${i}/init.log
