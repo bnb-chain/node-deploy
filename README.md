@@ -80,6 +80,12 @@ bash +x ./start_fullnode.sh restart 1 snap
 bash +x ./start_fullnode.sh stop 1 snap
 # clean the snap sync node1
 bash +x ./start_fullnode.sh clean 1 snap
+# start a snap sync node as fast node
+bash +x ./start_fullnode.sh start 2 snap "--tries-verify-mode none"
+# start a snap sync node with prune ancient
+bash +x ./start_fullnode.sh start 3 snap "--pruneancient"
+# start pruneblock for a node
+bash +x ./start_fullnode.sh pruneblock 3 snap
 ```
 
 You can see the logs in `.local/bsc/fullnode`.
