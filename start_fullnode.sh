@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# Exit script on error
+set -e
+
+
 basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
