@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"time"
+	"crypto/rand"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -15,6 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+
+	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
+	"github.com/consensys/gnark-crypto/ecc/bls12-381/fr"
 )
 
 // todo do the same for sending blob transaction
@@ -58,7 +62,7 @@ type ExtAcc struct {
 }
 
 func sendBlobs(client *ethclient.Client, fromEO ExtAcc, toAddr common.Address, value *uint256.Int, nonce uint64, withSidecar bool) (common.Hash, error) {
-	tx := createEmptyBlobTx(fromEO.Key, withSidecar, toAddr, value, nonce)
+	tx := createNonEmptyBlobTxs(fromEO.Key, withSidecar, toAddr, value, nonce)
 
 	err := client.SendTransaction(context.Background(), tx)
 	if err != nil {
@@ -106,4 +110,61 @@ func createEmptyBlobTx(key *ecdsa.PrivateKey, withSidecar bool, toAddr common.Ad
 	}
 	signer := types.NewCancunSigner(blobtx.ChainID.ToBig())
 	return types.MustSignNewTx(key, signer, blobtx)
+}
+
+func createNonEmptyBlobTxs(key *ecdsa.PrivateKey, withSidecar bool, toAddr common.Address, value *uint256.Int, nonce uint64) *types.Transaction {
+	blob := randBlob()
+
+	commitment, err := kzg4844.BlobToCommitment(blob)
+	if err != nil {
+		fmt.Println("error2: ", err)
+	}
+	proof, err := kzg4844.ComputeBlobProof(blob, commitment)
+	if err != nil {
+		fmt.Println("error3: ", err)
+	}
+
+	sidecar := &types.BlobTxSidecar{
+		Blobs:       []kzg4844.Blob{blob},
+		Commitments: []kzg4844.Commitment{commitment},
+		Proofs:      []kzg4844.Proof{proof},
+	}
+	blobtx := &types.BlobTx{
+		ChainID:    uint256.NewInt(714),
+		Nonce:      nonce,
+		GasTipCap:  uint256.NewInt(10 * params.GWei),
+		GasFeeCap:  uint256.NewInt(10 * params.GWei),
+		Gas:        25000,
+		To:         toAddr,
+		Value:      value,
+		Data:       nil,
+		BlobFeeCap: uint256.NewInt(3 * params.GWei),
+		BlobHashes: sidecar.BlobHashes(),
+	}
+	if withSidecar {
+		blobtx.Sidecar = sidecar
+	}
+	signer := types.NewCancunSigner(blobtx.ChainID.ToBig())
+	return types.MustSignNewTx(key, signer, blobtx)
+}
+
+func randBlob() kzg4844.Blob {
+	var blob kzg4844.Blob
+	for i := 0; i < len(blob); i += gokzg4844.SerializedScalarSize {
+		fieldElementBytes := randFieldElement()
+		copy(blob[i:i+gokzg4844.SerializedScalarSize], fieldElementBytes[:])
+	}
+	return blob
+}
+
+func randFieldElement() [32]byte {
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		panic("failed to get random field element")
+	}
+	var r fr.Element
+	r.SetBytes(bytes)
+
+	return gokzg4844.SerializeScalar(r)
 }
