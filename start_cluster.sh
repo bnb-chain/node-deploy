@@ -42,6 +42,12 @@ function reset_genesis() {
     
     poetry install --no-root
     npm install
+    rm -rf lib/forge-std
+    forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
+    cd lib/forge-std/lib
+    rm -rf ds-test
+    git clone https://github.com/dapphub/ds-test
+
 }
 
 function prepare_config() {
@@ -74,11 +80,6 @@ function prepare_config() {
     sed -i -e '/feynmanTime/d' ./genesis-template.json
 
     git checkout HEAD contracts
-
-    if [ ! -d "${workspace}/genesis/lib/forge-std" ];then
-        forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
-    fi
-
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${INIT_HOLDER}"
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
