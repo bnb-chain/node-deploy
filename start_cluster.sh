@@ -10,7 +10,8 @@ basedir=$(
 workspace=${basedir}
 source ${workspace}/.env
 size=$((BSC_CLUSTER_SIZE))
-stateScheme="hash"
+stateScheme="path"
+gcmode="full"
 epoch=200
 blockInterval=3
 
@@ -144,7 +145,7 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode archive --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
+            --gcmode ${gcmode} --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.feynmanfix ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
