@@ -92,6 +92,21 @@ You can see the logs in `.local/bsc/fullnode`.
 
 Generally, you need to wait for the validator to produce a certain amount of blocks before starting the full/snap syncing test, such as 1000 blocks.
 
+7. setup grafana monitor
+
+you must install [docker](https://docs.docker.com/get-docker/) and [docker-compose](https://docs.docker.com/compose/install/) first.
+
+```bash
+cd monitor
+docker-compose up -d
+```
+
+If all goes well, you can visit grafana in [http://127.0.0.1:3000/](http://127.0.0.1:3000/), default user/password is 'admin/admin'.
+
+Then you need import the dashboard in `monitor/dashboard/validator-monitor-1712916445176.json`.
+
+If you want to modify prometheus's config to add more bsc nodes, you can modify in here, `monitor/prometheus/prometheus.yml`. And restart it by `docker-compose restart prometheus`.
+
 ## Background transactions
 ```bash
 ## normal tx

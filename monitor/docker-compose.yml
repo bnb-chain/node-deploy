@@ -1,0 +1,38 @@
+version: "3"
+
+services:
+  prometheus:
+    image: bitnami/prometheus
+    container_name: bsc-prometheus
+    user: root
+    volumes:
+      - ./prometheus:/opt/bitnami/prometheus/conf
+      - prometheus-data:/opt/bitnami/prometheus/data
+    ports:
+      - 9090:9090
+    networks:
+      - custom
+
+  # 日志可视化
+  grafana:
+    image: grafana/grafana
+    container_name: bsc-grafana
+    user: root
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - 3000:3000
+    networks:
+      - custom
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  custom:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
