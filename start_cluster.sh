@@ -77,7 +77,6 @@ function prepare_config() {
 
     hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
     echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
-    sed -i -e '/feynmanTime/d' ./genesis-template.json
 
     git checkout HEAD contracts
     poetry run python -m scripts.generate generate-validators
@@ -116,8 +115,7 @@ function initNetwork() {
 }
 
 function native_start() {
-    FeynmanHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
-    CancunHardforkTime=`expr ${FeynmanHardforkTime} + 10`
+    CancunHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
 
     for ((i = 0; i < size; i++));do
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
@@ -145,7 +143,7 @@ function native_start() {
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode archive --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.feynmanfix ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
+            --rialtohash ${rialtoHash} --override.cancun ${CancunHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
