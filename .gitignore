@@ -7,3 +7,5 @@
 .local/
 
 .idea/
+
+/qa-env-resource/machines_meta.sh

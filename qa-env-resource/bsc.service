@@ -1,0 +1,19 @@
+[Unit]
+Description=bsc
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/server/validator/chaind.sh -start
+ExecReload=/server/validator/chaind.sh -restart
+ExecStop=/server/validator/chaind.sh -stop
+PrivateTmp=true
+Restart=always
+LimitNOFILE=10000
+RestartSec=5
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

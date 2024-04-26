@@ -9,8 +9,10 @@ basedir=$(
 )
 workspace=${basedir}
 source ${workspace}/.env
-size=$((BSC_CLUSTER_SIZE))
-stateScheme="path"
+source ${workspace}/qa-env-resource/machines_meta.sh # including machine ips and ids, don't upload!!!
+size=${#ips2ids[@]}
+stateScheme="hash"
+dbEngine="leveldb"
 gcmode="full"
 epoch=200
 blockInterval=3
@@ -35,25 +37,30 @@ function create_validator() {
 
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
-    cd  ${workspace}/genesis
-    cp genesis-template.json genesis-template.json.bk
-    git stash
-    cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
-    mv genesis-template.json.bk genesis-template.json
+    if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
+        cd ${workspace} &&  git submodule update --init --recursive && cd ${workspace}/genesis
+    else
+        cd ${workspace}/genesis
+        cp genesis-template.json genesis-template.json.bk
+        git stash
+        cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+        mv genesis-template.json.bk genesis-template.json
+    fi
     
-    poetry install --no-root
+    # poetry install --no-root
     npm install
     rm -rf lib/forge-std
     forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
-
 }
 
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
+    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
+    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
@@ -64,6 +71,17 @@ function prepare_config() {
         done
 
         mkdir -p ${workspace}/.local/bsc/node${i}
+        cp ${workspace}/.local/bsc/password.txt ${workspace}/.local/bsc/node${i}/
+        cp ${workspace}/qa-env-resource/* ${workspace}/.local/bsc/node${i}/
+        sed -i -e "s/{{validatorAddr}}/${cons_addr}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+        cp ${workspace}/.local/bsc/hardforkTime.txt ${workspace}/.local/bsc/node${i}/hardforkTime.txt
+        if  [ `expr $i \* 2` -ge ${size} ] ; then
+            sed -i.bak  "s/{{stateScheme}}/path/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+            sed -i.bak  "s/{{dbEngine}}/pebble/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+        else
+            sed -i.bak  "s/{{stateScheme}}/${stateScheme}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+            sed -i.bak  "s/{{dbEngine}}/${dbEngine}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+        fi
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
@@ -75,16 +93,11 @@ function prepare_config() {
     done
 
     cd ${workspace}/genesis/
-
-    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
-    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
-    sed -i -e '/feynmanTime/d' ./genesis-template.json
-
     git checkout HEAD contracts
-    poetry run python -m scripts.generate generate-validators
-    poetry run python -m scripts.generate generate-init-holders "${INIT_HOLDER}"
-    poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
-      --epoch ${epoch} --misdemeanor-threshold "5" --felony-threshold "10" \
+    python3 -m scripts.generate generate-validators
+    python3 -m scripts.generate generate-init-holders "${INIT_HOLDER}"
+    python3 -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
+      --epoch ${epoch} \
       --init-felony-slash-scope "60" \
       --breathe-block-interval "1 minutes" \
       --block-interval ${blockInterval} \
@@ -103,16 +116,21 @@ function prepare_config() {
 
 function initNetwork() {
     cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --init.ips "${validator_ips_comma}" --config ${workspace}/qa-env-resource/config.toml ${workspace}/genesis/genesis.json
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/node${i}
 
-        cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
+        #cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
+        cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/bsc
         # init genesis
         initLog=${workspace}/.local/bsc/node${i}/init.log
-        ${workspace}/.local/bsc/node${i}/geth${i} --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        if  [ `expr $i \* 2` -ge ${size} ] ; then
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        else
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        fi
     done
 }
 
@@ -145,10 +163,29 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode ${gcmode} --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
+            --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.feynmanfix ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
+    done
+}
+
+function remote_start() {
+    rm -rf /mnt/efs/bsc-qa/clusterNetwork
+    cp -r ${workspace}/.local/bsc /mnt/efs/bsc-qa/clusterNetwork
+    ips=(${validator_ips_comma//,/ })
+    for ((i=0;i<${#ips[@]};i++));do
+        dst_id=${ips2ids[${ips[i]}]}
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo bash -x /mnt/efs/bsc-qa/clusterNetwork/node${i}/init.sh"
+    done
+}
+
+function remote_upgrade() {
+    cp ${workspace}/bin/geth /mnt/efs/bsc-qa/clusterNetwork/
+    cp ${workspace}/qa-env-resource/upgrade-single.sh /mnt/efs/bsc-qa/clusterNetwork/
+    for dst_id in ${ips2ids[@]}; do
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
+            --parameters commands="sudo cp /mnt/efs/bsc-qa/clusterNetwork/geth /tmp/bsc && sudo cp /mnt/efs/bsc-qa/clusterNetwork/upgrade-single.sh /tmp/ && sudo bash -x /tmp/upgrade-single.sh"
     done
 }
 
@@ -258,6 +295,16 @@ restart)
     exit_previous
     native_start
     ;;
+remote_reset)
+    create_validator
+    reset_genesis
+    prepare_config
+    initNetwork
+    remote_start
+    ;;
+remote_upgrade)
+    remote_upgrade
+    ;;
 install_k8s)
     create_validator
     reset_genesis
@@ -270,6 +317,6 @@ uninstall_k8s)
     uninstall_k8s
     ;;
 *)
-    echo "Usage: start_cluster.sh | reset | stop | start | restart"
+    echo "Usage: start_cluster.sh | reset | stop | start | restart | remote_reset | remote_upgrade"
     ;;
 esac
