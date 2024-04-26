@@ -1,0 +1,82 @@
+[Eth]
+NetworkId = 714
+SyncMode = "full"
+NoPruning = false
+NoPrefetch = false
+TrieTimeout = 100000000000
+DatabaseCache = 512
+DatabaseFreezer = ""
+TriesInMemory = 128
+TrieCleanCache = 256
+TrieDirtyCache = 256
+EnablePreimageRecording = false
+EVNNodeIDsToAdd = []
+
+[Eth.Miner]
+GasCeil = 35000000
+GasPrice = 1000000000
+Recommit = 10000000000
+DelayLeftOver = 25000000
+
+[Eth.Miner.Mev]
+Enabled = true
+GreedyMergeTx = true
+BuilderFeeCeil= "0"
+ValidatorCommission = 1000
+BidSimulationLeftOver = 25000000
+NoInterruptLeftOver = 150000000
+MaxBidsPerBuilder = 2
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0xf7698afa5461438ff438c2322d6d29a5f7abdffd"
+
+[Eth.TxPool]
+Locals = []
+NoLocals = true
+Journal = "transactions.rlp"
+Rejournal = 3600000000000
+PriceLimit = 1000000000
+PriceBump = 10
+AccountSlots = 512
+GlobalSlots = 10000
+AccountQueue = 256
+GlobalQueue = 5000
+Lifetime = 10800000000000
+
+[Eth.GPO]
+Blocks = 20
+Percentile = 60
+OracleThreshold = 1000
+
+[Node]
+IPCPath = "geth.ipc"
+HTTPHost = "localhost"
+InsecureUnlockAllowed = false
+HTTPPort = 8545
+HTTPVirtualHosts = ["localhost"]
+HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "miner"]
+WSPort = 8546
+WSModules = ["net", "web3", "eth"]
+EnableEVNFeatures = true
+EnableQuickBlockFetching = true
+
+[Node.P2P]
+MaxPeers = 30
+NoDiscovery = false
+ListenAddr = ":30311"
+EnableMsgEvents = false
+EVNNodeIdsWhitelist = []
+ProxyedValidatorAddresses = []
+
+[Node.HTTPTimeouts]
+ReadTimeout = 30000000000
+WriteTimeout = 30000000000
+IdleTimeout = 120000000000
+
+[Node.LogConfig]
+FilePath = "bsc.log"
+TimeFormat = "01-02|15:04:05.000"
+MaxBackups = 1000
+MaxBytesSize = 10485760
+Level = "debug"
+FileRoot = ""
