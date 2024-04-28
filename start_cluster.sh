@@ -75,13 +75,6 @@ function prepare_config() {
         cp ${workspace}/qa-env-resource/* ${workspace}/.local/bsc/node${i}/
         sed -i -e "s/{{validatorAddr}}/${cons_addr}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
         cp ${workspace}/.local/bsc/hardforkTime.txt ${workspace}/.local/bsc/node${i}/hardforkTime.txt
-        if  [ `expr $i \* 2` -ge ${size} ] ; then
-            sed -i.bak  "s/{{stateScheme}}/path/g" ${workspace}/.local/bsc/node${i}/chaind.sh
-            sed -i.bak  "s/{{dbEngine}}/pebble/g" ${workspace}/.local/bsc/node${i}/chaind.sh
-        else
-            sed -i.bak  "s/{{stateScheme}}/${stateScheme}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
-            sed -i.bak  "s/{{dbEngine}}/${dbEngine}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
-        fi
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000"
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}

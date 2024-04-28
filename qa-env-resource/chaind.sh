@@ -25,7 +25,7 @@ function startChaind() {
         --ws --ws.port 8545 --ws.addr ${ip} --http.addr 0.0.0.0 --http.corsdomain "*" \
         --metrics --metrics.addr 0.0.0.0 \
         --pprof --pprof.port 6061 \
-        --syncmode snap --state.scheme {{stateScheme}} --db.engine {{dbEngine}} --mine --vote --monitor.maliciousvote \
+        --syncmode snap --mine --vote --monitor.maliciousvote \
         --cache 10480 --light.serve 50 \
         --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.feynmanfix ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
         --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
