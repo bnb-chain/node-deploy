@@ -1,9 +1,0 @@
-#!/bin/bash
-
-if [ "$(uname)" == "Darwin" ]; then
-    $(dirname "$0")/getInitConsensusState_macos $@
-elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-    $(dirname "$0")/getInitConsensusState_linux $@
-else
-    echo "unsupported platform"
-fi

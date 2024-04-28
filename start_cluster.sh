@@ -11,6 +11,7 @@ workspace=${basedir}
 source ${workspace}/.env
 size=$((BSC_CLUSTER_SIZE))
 stateScheme="path"
+dbEngine="pebble"
 gcmode="full"
 epoch=200
 blockInterval=3
@@ -35,11 +36,15 @@ function create_validator() {
 
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
-    cd  ${workspace}/genesis
-    cp genesis-template.json genesis-template.json.bk
-    git stash
-    cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
-    mv genesis-template.json.bk genesis-template.json
+    if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
+        cd ${workspace} &&  git submodule update --init --recursive && cd ${workspace}/genesis
+    else
+        cd ${workspace}/genesis
+        cp genesis-template.json genesis-template.json.bk
+        git stash
+        cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+        mv genesis-template.json.bk genesis-template.json
+    fi
     
     poetry install --no-root
     npm install
@@ -54,6 +59,8 @@ function reset_genesis() {
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
+    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
+    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
@@ -75,11 +82,6 @@ function prepare_config() {
     done
 
     cd ${workspace}/genesis/
-
-    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
-    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
-    sed -i -e '/feynmanTime/d' ./genesis-template.json
-
     git checkout HEAD contracts
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${INIT_HOLDER}"
@@ -112,7 +114,7 @@ function initNetwork() {
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
         # init genesis
         initLog=${workspace}/.local/bsc/node${i}/init.log
-        ${workspace}/.local/bsc/node${i}/geth${i} --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
     done
 }
 
@@ -145,7 +147,7 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode ${gcmode} --syncmode full --state.scheme ${stateScheme} --mine --vote --monitor.maliciousvote \
+            --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.feynman ${FeynmanHardforkTime} --override.feynmanfix ${FeynmanHardforkTime} --override.cancun ${CancunHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
