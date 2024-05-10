@@ -25,12 +25,11 @@ function exit_previous() {
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local/bsc
-    echo "${KEYPASS}" > ${workspace}/.local/bsc/password.txt
+    cp ${workspace}/keys/password.txt ${workspace}/.local/bsc/
 
     for ((i = 0; i < size; i++)); do
-        ${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i} --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}'
-        ${workspace}/bin/geth account new --datadir ${workspace}/.local/bsc/validator${i}_fee --password ${workspace}/.local/bsc/password.txt | grep "Public address of the key:" | awk -F"   " '{print $2}'
-        ${workspace}/bin/geth bls account new --datadir ${workspace}/.local/bsc/bls${i} --blspassword ${workspace}/.local/bsc/password.txt
+        cp -r ${workspace}/keys/validator${i} ${workspace}/.local/bsc/
+        cp -r ${workspace}/keys/bls${i} ${workspace}/.local/bsc/
     done
 }
 
@@ -64,10 +63,7 @@ function prepare_config() {
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
-        done
-
-        for f in ${workspace}/.local/bsc/validator${i}_fee/keystore/*; do
-            fee_addr="0x$(cat ${f} | jq -r .address)"
+            fee_addr=${cons_addr}
         done
 
         mkdir -p ${workspace}/.local/bsc/node${i}
