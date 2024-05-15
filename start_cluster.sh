@@ -79,6 +79,7 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     git checkout HEAD contracts
+    sed -i -e  s/^}/"function shutdownBCStaking() external { registeredContractChannelMap[VALIDATOR_CONTRACT_ADDR][STAKING_CHANNELID] = false; }}/" ${workspace}/genesis/contracts/CrossChain.sol
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${INIT_HOLDER}"
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
