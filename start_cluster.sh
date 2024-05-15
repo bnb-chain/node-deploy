@@ -15,6 +15,7 @@ dbEngine="pebble"
 gcmode="full"
 epoch=200
 blockInterval=3
+needRegister=false
 
 # stop geth client
 function exit_previous() {
@@ -60,9 +61,11 @@ function prepare_config() {
 
     hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
     echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
+    initHolders=${INIT_HOLDER}
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
+            initHolders=${initHolders}","${cons_addr}
             fee_addr=${cons_addr}
         done
 
@@ -79,9 +82,12 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     git checkout HEAD contracts
-    sed -i -e  s/^}/"function shutdownBCStaking() external { registeredContractChannelMap[VALIDATOR_CONTRACT_ADDR][STAKING_CHANNELID] = false; }}/" ${workspace}/genesis/contracts/CrossChain.sol
+    if ${needRegister};then
+        sed -i -e '/registeredContractChannelMap\[VALIDATOR_CONTRACT_ADDR\]\[STAKING_CHANNELID\]/d' ${workspace}/genesis/contracts/CrossChain.sol
+        sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 30) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
+    fi
     poetry run python -m scripts.generate generate-validators
-    poetry run python -m scripts.generate generate-init-holders "${INIT_HOLDER}"
+    poetry run python -m scripts.generate generate-init-holders "${initHolders}"
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
       --epoch ${epoch} --misdemeanor-threshold "5" --felony-threshold "10" \
       --init-felony-slash-scope "60" \
@@ -149,6 +155,17 @@ function native_start() {
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
+}
+
+function register_stakehub(){
+    if ${needRegister};then
+        echo "sleep 45s to wait feynman enable"
+        sleep 45
+        for ((i = 0; i < size; i++));do
+            ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+                --password-path ${workspace}/keys/password.txt --validator-desc Val${i} --rpc-url ${RPC_URL}
+        done
+    fi
 }
 
 ## docker relate begin
@@ -246,6 +263,7 @@ reset)
     prepare_config
     initNetwork
     native_start
+    register_stakehub
     ;;
 stop)
     exit_previous
