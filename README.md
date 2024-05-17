@@ -104,3 +104,12 @@ cd txblob
 go build
 ./txblob
 ```
+
+## Register validators in StakeHub
+cd create-validator
+go build
+
+switch the flag
+```
+needRegister=true
+```
