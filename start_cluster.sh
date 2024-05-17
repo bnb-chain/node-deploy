@@ -71,7 +71,7 @@ function prepare_config() {
 
         mkdir -p ${workspace}/.local/bsc/node${i}
         bbcfee_addrs=${fee_addr}
-        powers="0x000001d1a94a2000"
+        powers="0x000001d1a94a2000" #2000000000000
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
         vote_addr=0x$(cat ${workspace}/.local/bsc/node${i}/bls/keystore/*json | jq .pubkey | sed 's/"//g')
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
@@ -163,7 +163,7 @@ function register_stakehub(){
         sleep 45
         for ((i = 0; i < size; i++));do
             ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
-                --password-path ${workspace}/keys/password.txt --validator-desc Val${i} --rpc-url ${RPC_URL}
+                --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
         done
     fi
 }
