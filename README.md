@@ -105,8 +105,12 @@ go build
 ./txblob
 ```
 
-## Register validators in StakeHub
+## Register validators in StakeHub(Optional)
+After bc-fusion, the governance feature is transferred to bsc from bc,
+so register the validators into StakeHub if trying to test the governance.
+
 cd create-validator
+
 go build
 
 switch the flag
