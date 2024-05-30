@@ -16,11 +16,13 @@ gcmode="full"
 epoch=200
 blockInterval=3
 needRegister=false
+sleepBeforeStart=10
 
 # stop geth client
 function exit_previous() {
-    ps -ef  | grep geth | grep mine |awk '{print $2}' | xargs kill
-    sleep 10
+    ValIdx=$1
+    ps -ef  | grep geth$ValIdx | grep mine |awk '{print $2}' | xargs kill
+    sleep ${sleepBeforeStart}
 }
 
 function create_validator() {
@@ -124,7 +126,12 @@ function initNetwork() {
 function native_start() {
     CancunHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
 
+    ValIdx=$1
     for ((i = 0; i < size; i++));do
+        if [ ! -z $ValIdx ] && [ $i -ne $ValIdx ]; then
+            continue
+        fi
+
         for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
             cons_addr="0x$(cat ${j} | jq -r .address)"
         done
@@ -255,6 +262,7 @@ function uninstall_k8s() {
 ## docker relate end
 
 CMD=$1
+ValidatorIdx=$2
 case ${CMD} in
 reset)
     exit_previous
@@ -266,14 +274,14 @@ reset)
     register_stakehub
     ;;
 stop)
-    exit_previous
+    exit_previous $ValidatorIdx
     ;;
 start)
-    native_start
+    native_start $ValidatorIdx
     ;;
 restart)
-    exit_previous
-    native_start
+    exit_previous $ValidatorIdx
+    native_start $ValidatorIdx
     ;;
 install_k8s)
     create_validator
