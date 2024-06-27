@@ -124,7 +124,7 @@ function initNetwork() {
 }
 
 function native_start() {
-    CancunHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    BohrHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
 
     ValIdx=$1
     for ((i = 0; i < size; i++));do
@@ -157,7 +157,7 @@ function native_start() {
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.cancun ${CancunHardforkTime} --override.haber ${CancunHardforkTime} --override.bohr ${CancunHardforkTime} \
+            --rialtohash ${rialtoHash} --override.bohr ${BohrHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
