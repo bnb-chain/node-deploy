@@ -9,13 +9,14 @@ basedir=$(
 )
 workspace=${basedir}
 source ${workspace}/.env
-size=$((BSC_CLUSTER_SIZE))
-stateScheme="path"
-dbEngine="pebble"
+source ${workspace}/qa-env-resource/machines_meta.sh # including machine ips and ids, don't upload!!!
+size=${#ips2ids[@]}
+stateScheme="hash"
+dbEngine="leveldb"
 gcmode="full"
 epoch=200
 blockInterval=3
-needRegister=false
+needRegister=true
 sleepBeforeStart=10
 
 # stop geth client
@@ -48,14 +49,13 @@ function reset_genesis() {
         mv genesis-template.json.bk genesis-template.json
     fi
     
-    poetry install --no-root
+    # poetry install --no-root
     npm install
     rm -rf lib/forge-std
     forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
-
 }
 
 function prepare_config() {
@@ -72,6 +72,10 @@ function prepare_config() {
         done
 
         mkdir -p ${workspace}/.local/bsc/node${i}
+        cp ${workspace}/.local/bsc/password.txt ${workspace}/.local/bsc/node${i}/
+        cp ${workspace}/qa-env-resource/* ${workspace}/.local/bsc/node${i}/
+        sed -i -e "s/{{validatorAddr}}/${cons_addr}/g" ${workspace}/.local/bsc/node${i}/chaind.sh
+        cp ${workspace}/.local/bsc/hardforkTime.txt ${workspace}/.local/bsc/node${i}/hardforkTime.txt
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000" #2000000000000
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
@@ -88,10 +92,10 @@ function prepare_config() {
         sed -i -e '/registeredContractChannelMap\[VALIDATOR_CONTRACT_ADDR\]\[STAKING_CHANNELID\]/d' ${workspace}/genesis/contracts/CrossChain.sol
         sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 30) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     fi
-    poetry run python -m scripts.generate generate-validators
-    poetry run python -m scripts.generate generate-init-holders "${initHolders}"
-    poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
-      --epoch ${epoch} --misdemeanor-threshold "5" --felony-threshold "10" \
+    python3 -m scripts.generate generate-validators
+    python3 -m scripts.generate generate-init-holders "${initHolders}"
+    python3 -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
+      --epoch ${epoch} \
       --init-felony-slash-scope "60" \
       --breathe-block-interval "1 minutes" \
       --block-interval ${blockInterval} \
@@ -110,16 +114,21 @@ function prepare_config() {
 
 function initNetwork() {
     cd ${workspace}
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --init.ips "${validator_ips_comma}" --config ${workspace}/qa-env-resource/config.toml ${workspace}/genesis/genesis.json
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
         cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/node${i}
 
-        cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
+        #cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
+        cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/bsc
         # init genesis
         initLog=${workspace}/.local/bsc/node${i}/init.log
-        ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        if  [ `expr $i \* 2` -ge ${size} ] ; then
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        else
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        fi
     done
 }
 
@@ -173,6 +182,25 @@ function register_stakehub(){
                 --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
         done
     fi
+}
+
+function remote_start() {
+    rm -rf /mnt/efs/bsc-qa/clusterNetwork
+    cp -r ${workspace}/.local/bsc /mnt/efs/bsc-qa/clusterNetwork
+    ips=(${validator_ips_comma//,/ })
+    for ((i=0;i<${#ips[@]};i++));do
+        dst_id=${ips2ids[${ips[i]}]}
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo bash -x /mnt/efs/bsc-qa/clusterNetwork/node${i}/init.sh"
+    done
+}
+
+function remote_upgrade() {
+    cp ${workspace}/bin/geth /mnt/efs/bsc-qa/clusterNetwork/
+    cp ${workspace}/qa-env-resource/upgrade-single.sh /mnt/efs/bsc-qa/clusterNetwork/
+    for dst_id in ${ips2ids[@]}; do
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
+            --parameters commands="sudo cp /mnt/efs/bsc-qa/clusterNetwork/geth /tmp/bsc && sudo cp /mnt/efs/bsc-qa/clusterNetwork/upgrade-single.sh /tmp/ && sudo bash -x /tmp/upgrade-single.sh"
+    done
 }
 
 ## docker relate begin
@@ -283,6 +311,17 @@ restart)
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
     ;;
+remote_reset)
+    create_validator
+    reset_genesis
+    prepare_config
+    initNetwork
+    remote_start
+    register_stakehub
+    ;;
+remote_upgrade)
+    remote_upgrade
+    ;;
 install_k8s)
     create_validator
     reset_genesis
@@ -295,6 +334,6 @@ uninstall_k8s)
     uninstall_k8s
     ;;
 *)
-    echo "Usage: start_cluster.sh | reset | stop | start | restart"
+    echo "Usage: start_cluster.sh | reset | stop | start | restart | remote_reset | remote_upgrade"
     ;;
 esac
