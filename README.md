@@ -7,7 +7,7 @@ Before proceeding to the next steps, please ensure that the following packages a
 - npm: 6.14.6
 - go: 1.18+
 - foundry
-- python3
+- python3 3.12+
 - poetry
 - jq
 
