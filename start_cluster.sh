@@ -61,8 +61,8 @@ function reset_genesis() {
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
-    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
-    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
+    passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY})
+    echo "passedHardforkTime "${passedHardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
     initHolders=${INIT_HOLDER}
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
@@ -124,7 +124,8 @@ function initNetwork() {
 }
 
 function native_start() {
-    BohrHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    PassedForkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+    LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
 
     ValIdx=$1
     for ((i = 0; i < size; i++));do
@@ -157,7 +158,7 @@ function native_start() {
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.bohr ${BohrHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.bohr ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
