@@ -10,8 +10,8 @@ basedir=$(
 workspace=${basedir}
 source ${workspace}/.env
 size=$((BSC_CLUSTER_SIZE))
-stateScheme="path"
-dbEngine="pebble"
+stateScheme="hash"
+dbEngine="leveldb"
 gcmode="full"
 epoch=200
 blockInterval=3
@@ -28,7 +28,6 @@ function exit_previous() {
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local/bsc
-    cp ${workspace}/keys/password.txt ${workspace}/.local/bsc/
 
     for ((i = 0; i < size; i++)); do
         cp -r ${workspace}/keys/validator${i} ${workspace}/.local/bsc/
@@ -61,8 +60,8 @@ function reset_genesis() {
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
-    hardforkTime=$(expr $(date +%s) + ${HARD_FORK_DELAY})
-    echo "hardforkTime "${hardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
+    passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY})
+    echo "passedHardforkTime "${passedHardforkTime} > ${workspace}/.local/bsc/hardforkTime.txt
     initHolders=${INIT_HOLDER}
     for ((i = 0; i < size; i++)); do
         for f in ${workspace}/.local/bsc/validator${i}/keystore/*; do
@@ -72,6 +71,8 @@ function prepare_config() {
         done
 
         mkdir -p ${workspace}/.local/bsc/node${i}
+        cp ${workspace}/keys/password.txt ${workspace}/.local/bsc/node${i}/
+        cp ${workspace}/.local/bsc/hardforkTime.txt ${workspace}/.local/bsc/node${i}/
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000" #2000000000000
         mv ${workspace}/.local/bsc/bls${i}/bls ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/bls${i}
@@ -91,9 +92,9 @@ function prepare_config() {
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
-      --epoch ${epoch} --misdemeanor-threshold "5" --felony-threshold "10" \
+      --epoch ${epoch} \
       --init-felony-slash-scope "60" \
-      --breathe-block-interval "1 minutes" \
+      --breathe-block-interval "10 minutes" \
       --block-interval ${blockInterval} \
       --init-bc-consensus-addresses 'hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb9226600000000000000000000000070997970c51812dc3a010c7d01b50e0d17dc79c80000000000000000000000003c44cdddb6a900fa2b585dd299e03d12fa4293bc"' \
       --init-bc-vote-addresses 'hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000030b86b3146bdd2200b1dbdb1cea5e40d3451c028cbb4fb03b1826f7f2d82bee76bbd5cd68a74a16a7eceea093fd5826b9200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003087ce273bb9b51fd69e50de7a8d9a99cfb3b1a5c6a7b85f6673d137a5a2ce7df3d6ee4e6d579a142d58b0606c4a7a1c27000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030a33ac14980d85c0d154c5909ebf7a11d455f54beb4d5d0dc1d8b3670b9c4a6b6c450ee3d623ecc48026f09ed1f0b5c1200000000000000000000000000000000"' \
@@ -110,21 +111,32 @@ function prepare_config() {
 
 function initNetwork() {
     cd ${workspace}
+    for ((i = 0; i < size; i++)); do
+        mkdir ${workspace}/.local/bsc/node${i}/geth
+        cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
+    done
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
-        cp -R ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/node${i}
+        mv ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/validator${i}
 
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
         # init genesis
         initLog=${workspace}/.local/bsc/node${i}/init.log
-        ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        if  [ $i -eq 0 ] ; then
+                ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        elif  [ $i -eq 1 ] ; then
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble --multidatabase ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        else
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        fi
     done
 }
 
 function native_start() {
-    BohrHardforkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep hardforkTime|awk -F" " '{print $NF}'`
+    PassedForkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+    LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
 
     ValIdx=$1
     for ((i = 0; i < size; i++));do
@@ -132,7 +144,7 @@ function native_start() {
             continue
         fi
 
-        for j in ${workspace}/.local/bsc/validator${i}/keystore/*;do
+        for j in ${workspace}/.local/bsc/node${i}/keystore/*;do
             cons_addr="0x$(cat ${j} | jq -r .address)"
         done
 
@@ -150,16 +162,17 @@ function native_start() {
         # run BSC node
         nohup  ${workspace}/.local/bsc/node${i}/geth${i} --config ${workspace}/.local/bsc/node${i}/config.toml \
             --datadir ${workspace}/.local/bsc/node${i} \
-            --password ${workspace}/.local/bsc/password.txt \
-            --blspassword ${workspace}/.local/bsc/password.txt \
+            --password ${workspace}/.local/bsc/node${i}/password.txt \
+            --blspassword ${workspace}/.local/bsc/node${i}/password.txt \
             --nodekey ${workspace}/.local/bsc/node${i}/geth/nodekey \
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.bohr ${BohrHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.bohr ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+            `# --override.fixedturnlength ${FixedTurnLength}` \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
 }
@@ -214,7 +227,7 @@ function prepare_k8s_config() {
 
         kubectl delete secret password -n bsc
         kubectl create secret generic password -n bsc \
-          --from-file ${workspace}/.local/bsc/password.txt
+          --from-file ${workspace}/keys/password.txt
 
         kubectl delete configmap config${i} -n bsc
         kubectl create configmap config${i} -n bsc \

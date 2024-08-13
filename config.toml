@@ -19,7 +19,7 @@ GasPrice = 10000000000
 Recommit = 10000000000
 
 [Eth.Miner.Mev]
-Enabled = false
+Enabled = true
 GreedyMergeTx = true
 BuilderFeeCeil= "0"
 ValidatorCommission = 1000
