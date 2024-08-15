@@ -91,6 +91,7 @@ function prepare_config() {
     fi
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
+    quorum=$(($BSC_CLUSTER_SIZE*2/3+1))
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
       --epoch ${epoch} \
       --init-felony-slash-scope "60" \
@@ -104,6 +105,7 @@ function prepare_config() {
       --felony-jail-time "3 minutes" \
       --init-voting-delay "1 minutes / BLOCK_INTERVAL" \
       --init-voting-period "2 minutes / BLOCK_INTERVAL" \
+      --init-quorum-numerator "${quorum}" \
       --init-min-period-after-quorum "uint64(1 minutes / BLOCK_INTERVAL)" \
       --governor-protector "${INIT_HOLDER}" \
       --init-minimal-delay "1 minutes"
