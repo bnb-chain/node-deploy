@@ -42,9 +42,10 @@ go build -o ./build/bin/bootnode ./cmd/bootnode
 two different ways, choose as you like.
 ```bash
 bash -x ./bsc_cluster.sh reset # will reset the cluster and start
-bash -x ./bsc_cluster.sh stop  # only stop the cluster
-bash -x ./bsc_cluster.sh start # only start the cluster
-bash -x ./bsc_cluster.sh restart # start the cluster after stopping it
+# The 'vidx' parameter is optional. If provided, its value must be in the range [0, ${BSC_CLUSTER_SIZE}). If omitted, it affects all clusters.
+bash -x ./bsc_cluster.sh stop [vidx] # Stops the cluster
+bash -x ./bsc_cluster.sh start [vidx] # only start the cluster
+bash -x ./bsc_cluster.sh restart [vidx] # start the cluster after stopping it
 ```
 
 6. Setup a full node.
