@@ -190,92 +190,6 @@ function register_stakehub(){
     fi
 }
 
-## docker relate begin
-function generate_static_peers() {
-    tool=${workspace}/bin/bootnode
-    num=$1
-    target=$2
-    staticPeers=""
-    for ((i = 0; i < num; i++)); do
-        if [ $i -eq $target ]; then
-            continue
-        fi
-
-        file=${workspace}/.local/bsc/node${i}/geth/nodekey
-        if [ ! -f "$file" ]; then
-            $tool -genkey $file
-        fi
-        port=30311
-        domain="bsc-node-${i}.bsc.svc.cluster.local"
-        if [ -n "$staticPeers" ]; then
-            staticPeers+=","
-        fi
-        staticPeers+='"'"enode://$($tool -nodekey $file -writeaddress)@$domain:$port"'"'
-    done
-
-    echo $staticPeers
-}
-
-function prepare_k8s_config() {
-    kubectl create ns bsc
-
-    for ((i=0;i<${size};i++));do
-        kubectl delete secret keystore${i} -n bsc
-        files=""
-        for f in ${workspace}/.local/bsc/validator${i}/keystore/*;do
-         files="$files --from-file=$f"
-        done
-        bash -c "kubectl create secret generic keystore${i} -n bsc ${files}"
-
-        kubectl delete secret password -n bsc
-        kubectl create secret generic password -n bsc \
-          --from-file ${workspace}/keys/password.txt
-
-        kubectl delete configmap config${i} -n bsc
-        kubectl create configmap config${i} -n bsc \
-          --from-file ${workspace}/.local/bsc/.local/bsc/node${i}/config.toml \
-          --from-file ${workspace}/genesis/genesis.json
-
-        kubectl delete configmap nodekey${i} -n bsc
-        kubectl create configmap nodekey${i} -n bsc \
-          --from-file ${workspace}/.local/bsc/.local/bsc/node${i}/geth/nodekey
-    done
-
-}
-
-function initNetwork_k8s() {
-   cd ${workspace}
-   ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.ips=${ips_string} --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    for ((i = 0; i < size; i++));do
-        sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
-
-        staticPeers=$(generate_static_peers ${size} ${i})
-        line=$(grep -n -e 'StaticNodes' ${workspace}/.local/bsc/node${i}/config.toml | cut -d : -f 1)
-        head -n $((line-1)) ${workspace}/.local/bsc/node${i}/config.toml >> ${workspace}/.local/bsc/node${i}/config.toml-e
-        echo "StaticNodes = [${staticPeers}]" >> ${workspace}/.local/bsc/node${i}/config.toml-e
-        tail -n +$(($line+1)) ${workspace}/.local/bsc/node${i}/config.toml >> ${workspace}/.local/bsc/node${i}/config.toml-e
-        rm -f ${workspace}/.local/bsc/node${i}/config.toml
-        mv ${workspace}/.local/bsc/node${i}/config.toml-e ${workspace}/.local/bsc/node${i}/config.toml
-    done
-   rm -rf  ${workspace}/*bsc.log*
-}
-
-function install_k8s() {
-    for ((i = 0; i < size; i++));do
-        helm install bsc-node-${i} \
-          --namespace bsc --create-namespace \
-          --set-string configName=config${i},secretName=keystore${i},nodeKeyCfgName=nodekey${i} \
-          ${workspace}/helm/bsc
-    done
-}
-
-function uninstall_k8s() {
-    for ((i=0;i<${size};i++));do
-        helm uninstall bsc-node-${i} --namespace bsc
-    done
-}
-## docker relate end
-
 CMD=$1
 ValidatorIdx=$2
 case ${CMD} in
@@ -297,17 +211,6 @@ start)
 restart)
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
-    ;;
-install_k8s)
-    create_validator
-    reset_genesis
-    prepare_config
-    initNetwork_k8s
-    prepare_k8s_config
-    install_k8s
-    ;;
-uninstall_k8s)
-    uninstall_k8s
     ;;
 *)
     echo "Usage: start_cluster.sh | reset | stop | start | restart"
