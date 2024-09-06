@@ -109,7 +109,7 @@ pruneblock)
     echo "===== end ===="
     ;;
 *)
-    echo "Usage: start_fullnode.sh start|stop|restart|clean nodeIndex syncmode"
-    echo "like: start_fullnode.sh start 1 snap, it will startup a snapsync node1"
+    echo "Usage: bsc_fullnode.sh start|stop|restart|clean nodeIndex syncmode"
+    echo "like: bsc_fullnode.sh start 1 snap, it will startup a snapsync node1"
     ;;
 esac
