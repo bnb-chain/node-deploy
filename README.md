@@ -51,41 +51,41 @@ cp ./build/bin/bootnode ../bin/bootnode
 two different ways, choose as you like.
 ```bash
 #native deploy without docker
-bash -x ./start_cluster.sh reset # will reset the cluster and start
-bash -x ./start_cluster.sh stop  # only stop the cluster
-bash -x ./start_cluster.sh start # only start the cluster
-bash -x ./start_cluster.sh restart # start the cluster after stopping it
+bash -x ./bsc_cluster.sh reset # will reset the cluster and start
+bash -x ./bsc_cluster.sh stop  # only stop the cluster
+bash -x ./bsc_cluster.sh start # only start the cluster
+bash -x ./bsc_cluster.sh restart # start the cluster after stopping it
 ```
 
 ```bash
 #on k8s environment
 minikube start
-bash -x ./start_cluster.sh install_k8s
+bash -x ./bsc_cluster.sh install_k8s
 kubectl -n bsc port-forward svc/bsc-node-0 8545:8545
 ```
 
 6. Setup a full node.
 If you want to run a full node to test snap/full syncing, you can run:
 
-> Attention: it relies on the validator cluster, so you should set up validators by `start_cluster.sh` first.
+> Attention: it relies on the validator cluster, so you should set up validators by `bsc_cluster.sh` first.
 
 ```bash
 # start a full sync node0
-bash +x ./start_fullnode.sh start 0 full
+bash +x ./bsc_fullnode.sh start 0 full
 # start a snap sync node1
-bash +x ./start_fullnode.sh start 1 snap
+bash +x ./bsc_fullnode.sh start 1 snap
 # restart the snap sync node1
-bash +x ./start_fullnode.sh restart 1 snap
+bash +x ./bsc_fullnode.sh restart 1 snap
 # stop the snap sync node1
-bash +x ./start_fullnode.sh stop 1 snap
+bash +x ./bsc_fullnode.sh stop 1 snap
 # clean the snap sync node1
-bash +x ./start_fullnode.sh clean 1 snap
+bash +x ./bsc_fullnode.sh clean 1 snap
 # start a snap sync node as fast node
-bash +x ./start_fullnode.sh start 2 snap "--tries-verify-mode none"
+bash +x ./bsc_fullnode.sh start 2 snap "--tries-verify-mode none"
 # start a snap sync node with prune ancient
-bash +x ./start_fullnode.sh start 3 snap "--pruneancient"
+bash +x ./bsc_fullnode.sh start 3 snap "--pruneancient"
 # start pruneblock for a node
-bash +x ./start_fullnode.sh pruneblock 3 snap
+bash +x ./bsc_fullnode.sh pruneblock 3 snap
 ```
 
 You can see the logs in `.local/bsc/fullnode`.
