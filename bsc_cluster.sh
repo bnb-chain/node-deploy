@@ -213,6 +213,6 @@ restart)
     native_start $ValidatorIdx
     ;;
 *)
-    echo "Usage: bsc_cluster.sh | reset | stop | start | restart"
+    echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx]"
     ;;
 esac
