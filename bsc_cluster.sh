@@ -91,7 +91,7 @@ function prepare_config() {
     fi
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
-    quorum=$(($BSC_CLUSTER_SIZE*2/3+1))
+    quorum=$(($size*2/3+1))
     poetry run python -m scripts.generate dev --dev-chain-id ${BSC_CHAIN_ID} --whitelist-1 "${INIT_HOLDER}" \
       --epoch ${epoch} \
       --init-felony-slash-scope "60" \
