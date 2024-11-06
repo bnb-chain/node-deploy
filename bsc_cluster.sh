@@ -39,11 +39,13 @@ function create_validator() {
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
         cd ${workspace} &&  git submodule update --init --recursive && cd ${workspace}/genesis
+        git reset --hard ${GENESIS_COMMIT}
     else
         cd ${workspace}/genesis
         cp genesis-template.json genesis-template.json.bk
         git stash
         cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+        git reset --hard ${GENESIS_COMMIT}
         mv genesis-template.json.bk genesis-template.json
     fi
     
