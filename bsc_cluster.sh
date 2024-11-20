@@ -157,7 +157,7 @@ function native_start() {
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
 
         initLog=${workspace}/.local/bsc/node${i}/init.log
-        rialtoHash=`cat ${initLog}|grep "database=lightchaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+        rialtoHash=`cat ${initLog}|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
         # run BSC node
         nohup  ${workspace}/.local/bsc/node${i}/geth${i} --config ${workspace}/.local/bsc/node${i}/config.toml \
