@@ -35,8 +35,9 @@ fi
 node=node$index
 dst=${workspace}/.local/bsc/fullnode/${node}
 hardforkfile=${workspace}/.local/bsc/hardforkTime.txt
-rialtoHash=`cat $src/init.log|grep "database=lightchaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
-BohrHardforkTime=`cat $hardforkfile | grep hardforkTime | awk -F" " '{print $NF}'`
+rialtoHash=`cat $src/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+PassedForkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
 
 mkdir -pv $dst/
 
@@ -51,7 +52,7 @@ function start() {
   --ws.addr 0.0.0.0 --ws.port $(( 8600 + $index )) --http.addr 0.0.0.0 --http.port $(( 8600 + $index )) --http.corsdomain "*" \
   --metrics --metrics.addr 0.0.0.0 --metrics.port $(( 6100 + $index )) --metrics.expensive \
   --gcmode $gcmode --syncmode $syncmode --state.scheme ${stateScheme} $extraflags \
-  --rialtohash ${rialtoHash} --override.bohr ${BohrHardforkTime} \
+  --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.bohr ${LastHardforkTime} \
   --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
   --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
   > $dst/bsc-node.log 2>&1 &
