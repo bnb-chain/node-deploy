@@ -30,7 +30,15 @@ cd bsc && make geth
 go build -o ./build/bin/bootnode ./cmd/bootnode
 ```
 
-4. Configure the cluster
+4. build `create-validator`
+
+```bash
+# This tool is used to register the validators into StakeHub.
+cd create-validator
+go build
+```
+
+5. Configure the cluster
 ```
   You can configure the cluster by modifying the following files:
    - `config.toml`
@@ -38,7 +46,7 @@ go build -o ./build/bin/bootnode ./cmd/bootnode
    - `.env`
 ```
 
-5. Setup all nodes.
+6. Setup all nodes.
 two different ways, choose as you like.
 ```bash
 bash -x ./bsc_cluster.sh reset # will reset the cluster and start
@@ -48,7 +56,7 @@ bash -x ./bsc_cluster.sh start [vidx] # only start the cluster
 bash -x ./bsc_cluster.sh restart [vidx] # start the cluster after stopping it
 ```
 
-6. Setup a full node.
+7. Setup a full node.
 If you want to run a full node to test snap/full syncing, you can run:
 
 > Attention: it relies on the validator cluster, so you should set up validators by `bsc_cluster.sh` firstly.
@@ -87,17 +95,4 @@ go build
 cd txblob
 go build
 ./txblob
-```
-
-## Register validators in StakeHub(Optional)
-After bc-fusion, the governance feature is transferred to bsc from bc,
-so register the validators into StakeHub if trying to test the governance.
-
-cd create-validator
-
-go build
-
-switch the flag
-```
-needRegister=true
 ```
