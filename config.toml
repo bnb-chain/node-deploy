@@ -3,7 +3,6 @@ NetworkId = 714
 SyncMode = "full"
 NoPruning = false
 NoPrefetch = false
-LightPeers = 100
 DatabaseCache = 512
 DatabaseFreezer = ""
 TrieCleanCache = 256
@@ -44,7 +43,6 @@ Lifetime = 10800000000000
 [Node]
 IPCPath = "geth.ipc"
 HTTPHost = "0.0.0.0"
-NoUSB = true
 InsecureUnlockAllowed = true
 HTTPPort = 8545
 HTTPVirtualHosts = ["*"]
