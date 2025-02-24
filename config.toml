@@ -57,6 +57,16 @@ StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
 
+[Node.VDN]
+HostAddress = "127.0.0.1"
+TCPPort = 13000
+QUICPort = 13000
+MaxPeers = 50
+EnableQuic = true
+EnableDiscovery = true
+StaticPeers = []
+BootStrapAddrs = []
+
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000
 WriteTimeout = 30000000000

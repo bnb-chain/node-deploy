@@ -151,7 +151,9 @@ function native_start() {
         HTTPPort=$((8545 + i))
         WSPort=${HTTPPort}
         MetricsPort=$((6060 + i))
- 
+        VDNTCPPort=$((13000 + i))
+        VDNQUICPort=$((13000 + i))
+
         # geth may be replaced
         rm -f ${workspace}/.local/bsc/node${i}/geth${i}
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
@@ -167,6 +169,7 @@ function native_start() {
             --nodekey ${workspace}/.local/bsc/node${i}/geth/nodekey \
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+            --vdn.tcpport ${VDNTCPPort} --vdn.quicport ${VDNQUICPort} --vdn.nodekey ${workspace}/.local/bsc/node${i}/geth/nodekey_vdn \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.pascal ${LastHardforkTime} --override.prague ${LastHardforkTime} \
