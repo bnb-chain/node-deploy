@@ -65,7 +65,7 @@ MaxPeers = 50
 EnableQuic = true
 EnableDiscovery = true
 StaticPeers = []
-BootStrapAddrs = []
+BootstrapPeers = []
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000
