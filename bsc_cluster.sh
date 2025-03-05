@@ -83,11 +83,12 @@ function prepare_config() {
         echo "validatorFee" ${i} ":" ${fee_addr}
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
+    rm -f ${workspace}/.local/bsc/hardforkTime.txt
 
     cd ${workspace}/genesis/
     git checkout HEAD contracts
 
-    sed -i -e '/registeredContractChannelMap\[VALIDATOR_CONTRACT_ADDR\]\[STAKING_CHANNELID\]/d' ${workspace}/genesis/contracts/CrossChain.sol
+    sed -i -e '/registeredContractChannelMap\[VALIDATOR_CONTRACT_ADDR\]\[STAKING_CHANNELID\]/d' ${workspace}/genesis/contracts/deprecated/CrossChain.sol
     sed -i -e  's/alreadyInit = true;/turnLength = 4;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 30) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     
@@ -116,7 +117,7 @@ function initNetwork() {
         cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
     done
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
-    rm -rf ${workspace}/*bsc.log*
+    rm -f ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
         mv ${workspace}/.local/bsc/validator${i}/keystore ${workspace}/.local/bsc/node${i}/ && rm -rf ${workspace}/.local/bsc/validator${i}
@@ -131,11 +132,12 @@ function initNetwork() {
         else
             ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
+        rm -f ${workspace}/.local/bsc/node${i}/*bsc.log*
     done
 }
 
 function native_start() {
-    PassedForkTime=`cat ${workspace}/.local/bsc/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+    PassedForkTime=`cat ${workspace}/.local/bsc/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
 
     ValIdx=$1
@@ -169,7 +171,7 @@ function native_start() {
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.pascal ${LastHardforkTime} --override.prague ${LastHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.pascal ${LastHardforkTime} --override.prague ${LastHardforkTime} --override.lorentz ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             `# --override.fixedturnlength ${FixedTurnLength}` \
