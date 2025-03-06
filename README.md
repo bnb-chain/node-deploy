@@ -49,7 +49,7 @@ go build
 6. Setup all nodes.
 two different ways, choose as you like.
 ```bash
-bash -x ./bsc_cluster.sh reset # will reset the cbnluster and start
+bash -x ./bsc_cluster.sh reset # will reset the cluster and start
 # The 'vidx' parameter is optional. If provided, its value must be in the range [0, ${BSC_CLUSTER_SIZE}). If omitted, it affects all clusters.
 bash -x ./bsc_cluster.sh stop [vidx] # Stops the cluster
 bash -x ./bsc_cluster.sh start [vidx] # only start the cluster

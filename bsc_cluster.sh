@@ -115,7 +115,7 @@ function initNetwork() {
         mkdir ${workspace}/.local/bsc/node${i}/geth
         cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
     done
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json --legacyp2p ${ENABLE_LEGACY_P2P}
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
