@@ -115,7 +115,7 @@ function initNetwork() {
         mkdir ${workspace}/.local/bsc/node${i}/geth
         cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
     done
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json --legacyp2p ${ENABLE_LEGACY_P2P}
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --init.legacyp2p ${ENABLE_LEGACY_P2P} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
@@ -176,7 +176,7 @@ function native_start() {
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             `# --override.fixedturnlength ${FixedTurnLength}` \
-            > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
+            >> ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
 }
 
