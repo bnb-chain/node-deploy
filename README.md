@@ -96,3 +96,8 @@ cd txblob
 go build
 ./txblob
 ```
+
+## Env Setting
+
+- `ENABLE_LEGACY_P2P`
+When set to `1`, it will init legacy p2p network. When set to `0`, it will skip init legacy P2P.
