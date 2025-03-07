@@ -115,7 +115,14 @@ function initNetwork() {
         mkdir ${workspace}/.local/bsc/node${i}/geth
         cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
     done
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --init.legacyp2p ${ENABLE_LEGACY_P2P} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    p2p_flags=""
+    if [ ${ENABLE_LEGACY_P2P} = "true" ]; then
+      p2p_flags="--init.disable-legacyp2p"
+    fi
+    if [ ${DISABLE_VDN} = "true" ]; then
+      p2p_flags=$p2p_flags" --init.disable-vdn"
+    fi
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --init.disable-legacyp2p  --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
     rm -rf ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
