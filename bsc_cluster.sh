@@ -161,6 +161,9 @@ function native_start() {
         initLog=${workspace}/.local/bsc/node${i}/init.log
         rialtoHash=`cat ${initLog}|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
+        # update `config` in genesis.json
+        ${workspace}/.local/bsc/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/bsc/node${i} | jq . > ${workspace}/.local/bsc/node${i}/genesis.json
+
         # run BSC node
         nohup  ${workspace}/.local/bsc/node${i}/geth${i} --config ${workspace}/.local/bsc/node${i}/config.toml \
             --datadir ${workspace}/.local/bsc/node${i} \
@@ -174,7 +177,6 @@ function native_start() {
             --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.pascal ${LastHardforkTime} --override.prague ${LastHardforkTime} --override.lorentz ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            `# --override.fixedturnlength ${FixedTurnLength}` \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
     done
 }
