@@ -3,17 +3,17 @@ NetworkId = 714
 SyncMode = "full"
 NoPruning = false
 NoPrefetch = false
+TrieTimeout = 100000000000
 DatabaseCache = 512
 DatabaseFreezer = ""
+TriesInMemory = 128
 TrieCleanCache = 256
 TrieDirtyCache = 256
-TriesInMemory = 128
-TrieTimeout = 3600000000000
 EnablePreimageRecording = false
 
 [Eth.Miner]
 GasCeil = 60000000
-GasPrice = 10000000000
+GasPrice = 1000000000
 Recommit = 10000000000
 DelayLeftOver = 50000000
 
@@ -23,38 +23,40 @@ GreedyMergeTx = true
 BuilderFeeCeil= "0"
 ValidatorCommission = 1000
 BidSimulationLeftOver = 50000000
-
-[[Eth.Miner.Mev.Builders]]
-Address = "0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186"
+NoInterruptLeftOver = 250000000
 
 [Eth.TxPool]
 Locals = []
 NoLocals = true
 Journal = "transactions.rlp"
 Rejournal = 3600000000000
-PriceLimit = 10000000000
+PriceLimit = 1000000000
 PriceBump = 10
-AccountSlots = 16
-GlobalSlots = 4096
-AccountQueue = 64
-GlobalQueue = 1024
+AccountSlots = 512
+GlobalSlots = 10000
+AccountQueue = 256
+GlobalQueue = 5000
 Lifetime = 10800000000000
+
+[Eth.GPO]
+Blocks = 20
+Percentile = 60
+OracleThreshold = 1000
 
 [Node]
 IPCPath = "geth.ipc"
-HTTPHost = "0.0.0.0"
-InsecureUnlockAllowed = true
+HTTPHost = "localhost"
+InsecureUnlockAllowed = false
 HTTPPort = 8545
-HTTPVirtualHosts = ["*"]
-HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
-WSHost = "0.0.0.0"
-WSPort = 8545
+HTTPVirtualHosts = ["localhost"]
+HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "miner"]
+WSPort = 8546
+WSModules = ["net", "web3", "eth"]
 
 [Node.P2P]
-MaxPeers = 50
+MaxPeers = 30
 NoDiscovery = false
-StaticNodes = []
-TrustedNodes = []
+ListenAddr = ":30311"
 EnableMsgEvents = false
 
 [Node.HTTPTimeouts]
