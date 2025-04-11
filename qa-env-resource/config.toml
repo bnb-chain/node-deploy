@@ -22,6 +22,7 @@ DelayLeftOver = 25000000
 Enabled = true
 GreedyMergeTx = true
 BuilderFeeCeil= "0"
+SentryURL = "http://172.22.43.120:8546"
 ValidatorCommission = 1000
 BidSimulationLeftOver = 25000000
 NoInterruptLeftOver = 150000000

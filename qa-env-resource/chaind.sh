@@ -11,7 +11,7 @@ FullImmutabilityThreshold=90000
 MinBlocksForBlobRequests=524288
 DefaultExtraReserveForBlobRequests=28800
 BreatheBlockInterval=600
-LAST_FORK_MORE_DELAY=200
+LAST_FORK_MORE_DELAY=18000000
 
 function startChaind() {
     workspace=/server/${workdir}
