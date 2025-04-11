@@ -1,14 +1,14 @@
 [Unit]
-Description=bsc
+Description=reth-bsc
 After=network.target
 
 [Service]
 Type=simple
 User=root
 Group=root
-ExecStart=/server/validator/chaind.sh -start
-ExecReload=/server/validator/chaind.sh -restart
-ExecStop=/server/validator/chaind.sh -stop
+ExecStart=/server/validator/reth-bsc-chaind.sh -start
+ExecReload=/server/validator/reth-bsc-chaind.sh -restart
+ExecStop=/server/validator/reth-bsc-chaind.sh -stop
 PrivateTmp=true
 LimitNOFILE=10000
 StartLimitInterval=0

@@ -11,7 +11,7 @@ FullImmutabilityThreshold=90000
 MinBlocksForBlobRequests=524288
 DefaultExtraReserveForBlobRequests=28800
 BreatheBlockInterval=600
-LAST_FORK_MORE_DELAY=200
+LAST_FORK_MORE_DELAY=600
 
 function startChaind() {
     workspace=/server/${workdir}
@@ -32,12 +32,12 @@ function startChaind() {
         --mine --vote --unlock {{validatorAddr}} --miner.etherbase {{validatorAddr}} --password ${workspace}/password.txt --blspassword ${workspace}/password.txt \
         --datadir ${workspace} \
         --rpc.allow-unprotected-txs --allow-insecure-unlock \
-        --ws --ws.addr ${ip} --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --ws --ws.addr ${ip} --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" --http.api debug,trace,eth,txpool,net,web3,miner,admin,mev --ws.api debug,trace,eth,txpool,net,web3,miner,admin,mev \
         --metrics --metrics.addr 0.0.0.0 --metrics.port ${MetricsPort} \
         --pprof --pprof.port ${PProfPort} \
         --syncmode full --monitor.maliciousvote \
         --cache 10480 \
-        --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+        --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
         --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
         --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
         >> /mnt/efs/${workdir}/${ip}/bscnode.log 2>&1
@@ -70,6 +70,7 @@ case $CMD in
     stopChaind
     ;;
 -restart)
+    echo "restart"
     stopChaind
     sleep 3
     startChaind

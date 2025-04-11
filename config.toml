@@ -21,7 +21,7 @@ MaxWaitProposalInSecs = 3
 [Eth.Miner.Mev]
 Enabled = true
 GreedyMergeTx = true
-BuilderFeeCeil= "0"
+BuilderFeeCeil = "0"
 ValidatorCommission = 1000
 
 [[Eth.Miner.Mev.Builders]]
@@ -49,12 +49,12 @@ HTTPVirtualHosts = ["*"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
-EnableEVNFeatures = true
-EnableQuickBlockFetching = true
+EnableEVNFeatures = false
+EnableQuickBlockFetching = false
 
 [Node.P2P]
 MaxPeers = 50
-NoDiscovery = false
+NoDiscovery = true
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
