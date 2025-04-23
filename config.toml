@@ -49,6 +49,8 @@ HTTPVirtualHosts = ["*"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
+EnableBroadcastFeature = true
+EnableQuickBlockFetching = true
 
 [Node.P2P]
 MaxPeers = 50
@@ -56,6 +58,7 @@ NoDiscovery = false
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
+DirectBroadcastList =[]
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000

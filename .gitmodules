@@ -1,5 +1,5 @@
 [submodule "genesis"]
 	path = genesis
 	url = https://github.com/bnb-chain/bsc-genesis-contract.git
-	branch = master
+	branch = validator-network
 	ignore = dirty
