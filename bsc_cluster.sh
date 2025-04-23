@@ -37,17 +37,19 @@ function create_validator() {
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
-        cd ${workspace} &&  git submodule update --init --recursive && cd ${workspace}/genesis
+        cd ${workspace} && git submodule update --init --recursive && cd ${workspace}/genesis
         git reset --hard ${GENESIS_COMMIT}
-    else
-        cd ${workspace}/genesis
-        cp genesis-template.json genesis-template.json.bk
-        git stash
-        cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
-        git reset --hard ${GENESIS_COMMIT}
-        mv genesis-template.json.bk genesis-template.json
     fi
-    
+    if [ ! -d "${workspace}/bsc" ]; then
+        cd ${workspace} && git submodule add https://github.com/bnb-chain/bsc.git bsc
+    fi
+    cd ${workspace}/genesis
+    cp genesis-template.json genesis-template.json.bk
+    git stash
+    cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+    git reset --hard ${GENESIS_COMMIT}
+    mv genesis-template.json.bk genesis-template.json
+
     poetry install --no-root
     npm install
     rm -rf lib/forge-std
@@ -56,6 +58,7 @@ function reset_genesis() {
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
 
+    cd ${workspace}/bsc && make geth && mkdir -p ${workspace}/bin && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/geth
 }
 
 function prepare_config() {

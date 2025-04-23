@@ -3,3 +3,8 @@
 	url = https://github.com/bnb-chain/bsc-genesis-contract.git
 	branch = validator-network
 	ignore = dirty
+[submodule "bsc"]
+	path = bsc
+	url = https://github.com/bnb-chain/bsc.git
+	branch = develop_evn
+	ignore = dirty
