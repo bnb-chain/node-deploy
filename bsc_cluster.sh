@@ -95,7 +95,7 @@ function prepare_config() {
     # to test unregister relayer
     # sed -i -e  's/currentRelayers\[addr\] = true;/currentRelayers\[addr\] = true; relayersExistMap\[addr\] = true;/' ${workspace}/genesis/contracts/deprecated/RelayerHub.sol
     sed -i -e  's/alreadyInit = true;/turnLength = 8;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
-    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 30) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
+    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 3000) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
 
     python3 -m scripts.generate generate-validators
     python3 -m scripts.generate generate-init-holders "${initHolders}"
@@ -179,7 +179,7 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
+            --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote --history.transactions 0 \
             --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
@@ -245,6 +245,7 @@ remote_reset)
     prepare_config
     initNetwork
     remote_start
+    remote_upgrade //to prevent stuck
     register_stakehub
     ;;
 remote_upgrade)
