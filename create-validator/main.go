@@ -127,7 +127,7 @@ func main() {
 		Nonce:    nonce,
 		To:       &stakeHubAddr,
 		Value:    delegation,
-		Gas:      5000000,
+		Gas:      2000000,
 		GasPrice: gasPrice,
 		Data:     data,
 	})

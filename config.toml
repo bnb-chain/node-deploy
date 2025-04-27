@@ -10,12 +10,13 @@ TrieDirtyCache = 256
 TriesInMemory = 128
 TrieTimeout = 3600000000000
 EnablePreimageRecording = false
+DirectBroadcast = true
 
 [Eth.Miner]
-GasCeil = 40000000
+GasCeil = 3000000
 GasPrice = 10000000000
 Recommit = 10000000000
-DelayLeftOver = 50000000
+DelayLeftOver = 10000000
 
 [Eth.Miner.Mev]
 Enabled = true
