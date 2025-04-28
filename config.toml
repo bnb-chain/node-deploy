@@ -13,7 +13,7 @@ EnablePreimageRecording = false
 
 [Eth.Miner]
 GasCeil = 40000000
-GasPrice = 10000000000
+GasPrice = 1000000000
 Recommit = 10000000000
 DelayLeftOver = 50000000
 
@@ -32,7 +32,7 @@ Locals = []
 NoLocals = true
 Journal = "transactions.rlp"
 Rejournal = 3600000000000
-PriceLimit = 10000000000
+PriceLimit = 1000000000
 PriceBump = 10
 AccountSlots = 16
 GlobalSlots = 4096
@@ -71,5 +71,5 @@ FilePath = "bsc.log"
 TimeFormat = "01-02|15:04:05.000"
 MaxBackups = 1000
 MaxBytesSize = 10485760
-Level = "trace"
+Level = "debug"
 FileRoot = ""

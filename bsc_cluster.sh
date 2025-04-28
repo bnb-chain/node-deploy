@@ -156,6 +156,7 @@ function native_start() {
         HTTPPort=$((8545 + i))
         WSPort=${HTTPPort}
         MetricsPort=$((6060 + i))
+        PProfPort=$((7060 + i))
  
         # geth may be replaced
         rm -f ${workspace}/.local/bsc/node${i}/geth${i}
@@ -176,6 +177,7 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+            --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${LastHardforkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
