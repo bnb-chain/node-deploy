@@ -10,6 +10,7 @@ TrieDirtyCache = 256
 TriesInMemory = 128
 TrieTimeout = 3600000000000
 EnablePreimageRecording = false
+ValidatorNodeIDsToAdd = []
 
 [Eth.Miner]
 GasCeil = 40000000
@@ -58,8 +59,8 @@ NoDiscovery = false
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
-DirectBroadcastList = []
-ProxyedValidatorList = []
+DirectBroadcastNodeIDs = []
+ProxyedValidatorNodeIDs = []
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000
@@ -71,5 +72,5 @@ FilePath = "bsc.log"
 TimeFormat = "01-02|15:04:05.000"
 MaxBackups = 1000
 MaxBytesSize = 10485760
-Level = "debug"
+Level = "trace"
 FileRoot = ""

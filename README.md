@@ -10,6 +10,7 @@ Before proceeding to the next steps, please ensure that the following packages a
 - python3 3.12+
 - poetry
 - jq
+- openssl
 
 
 ## Quick Start
