@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 service bsc stop
-cp /tmp/bsc /server/validator/bsc
+cp /tmp/geth /server/validator/bsc
 # update `config` in genesis.json
 # /server/validator/bsc dumpgenesis  --datadir /server/validator/ > /server/validator/genesis.json
 

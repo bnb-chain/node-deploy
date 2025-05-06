@@ -10,6 +10,7 @@ TriesInMemory = 128
 TrieCleanCache = 256
 TrieDirtyCache = 256
 EnablePreimageRecording = false
+EVNNodeIDsToAdd = []
 
 [Eth.Miner]
 GasCeil = 35000000
@@ -56,12 +57,16 @@ HTTPVirtualHosts = ["localhost"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "miner"]
 WSPort = 8546
 WSModules = ["net", "web3", "eth"]
+EnableEVNFeatures = true
+EnableQuickBlockFetching = true
 
 [Node.P2P]
 MaxPeers = 30
 NoDiscovery = false
 ListenAddr = ":30311"
 EnableMsgEvents = false
+EVNNodeIdsWhitelist = []
+ProxyedValidatorNodeIDs = []
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000

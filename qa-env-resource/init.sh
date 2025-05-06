@@ -1,12 +1,16 @@
 #!/bin/bash
 
 workspace=$(cd `dirname $0`; pwd)
+workdir="validator"
+bin="bsc"
 
-cp ${workspace}/bsc.service /usr/lib/systemd/system/
-chmod +x ${workspace}/start.sh ${workspace}/chaind.sh ${workspace}/bsc
+cp ${workspace}/${bin}.service /usr/lib/systemd/system/
+chmod +x ${workspace}/chaind.sh ${workspace}/${bin}
 
-service bsc stop
-rm -rf /server/validator
-cp -r ${workspace} /server/validator/
+service ${bin} stop
+rm -rf /server/${workdir}
+cp -r ${workspace} /server/${workdir}
 
-/server/validator/start.sh
+systemctl daemon-reload
+chkconfig ${bin} on
+service ${bin} restart
