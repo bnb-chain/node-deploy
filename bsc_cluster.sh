@@ -61,6 +61,7 @@ function prepare_bsc_client() {
         if [ ! -d "${workspace}/bsc" ]; then
             cd ${workspace} && git submodule add https://github.com/bnb-chain/bsc.git bsc
         fi
+        git submodule update --remote --recursive bsc
         cd ${workspace}/bsc && make geth && mkdir -p ${workspace}/bin && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/geth
     fi
 }
