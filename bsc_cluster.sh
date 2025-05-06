@@ -40,9 +40,6 @@ function reset_genesis() {
         cd ${workspace} && git submodule update --init --recursive && cd ${workspace}/genesis
         git reset --hard ${GENESIS_COMMIT}
     fi
-    if [ ! -d "${workspace}/bsc" ]; then
-        cd ${workspace} && git submodule add https://github.com/bnb-chain/bsc.git bsc
-    fi
     cd ${workspace}/genesis
     cp genesis-template.json genesis-template.json.bk
     git stash
@@ -57,8 +54,15 @@ function reset_genesis() {
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
+}
 
-    cd ${workspace}/bsc && make geth && mkdir -p ${workspace}/bin && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/geth
+function prepare_bsc_client() {
+    if [ ${useLatestBscClient} = true ]; then
+        if [ ! -d "${workspace}/bsc" ]; then
+            cd ${workspace} && git submodule add https://github.com/bnb-chain/bsc.git bsc
+        fi
+        cd ${workspace}/bsc && make geth && mkdir -p ${workspace}/bin && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/geth
+    fi
 }
 
 function prepare_config() {
@@ -120,10 +124,10 @@ function initNetwork() {
     cd ${workspace}
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/bsc/node${i}/geth
-        cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
+        cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
         if [ ${EnableSentryNode} = true ]; then
             mkdir ${workspace}/.local/bsc/sentry${i}/geth
-            openssl rand -hex 32 > ${workspace}/.local/bsc/sentry${i}/geth/nodekey
+            cp ${workspace}/keys/sentry-nodekey${i} ${workspace}/.local/bsc/sentry${i}/geth/nodekey
         fi
     done
     
@@ -227,14 +231,12 @@ function native_start() {
 }
 
 function register_stakehub(){
-    if ${needRegister};then
-        echo "sleep 45s to wait feynman enable"
-        sleep 45
-        for ((i = 0; i < size; i++));do
-            ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
-                --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
-        done
-    fi
+    echo "sleep 45s to wait feynman enable"
+    sleep 45
+    for ((i = 0; i < size; i++));do
+        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+            --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
+    done
 }
 
 CMD=$1
@@ -243,6 +245,7 @@ case ${CMD} in
 reset)
     exit_previous
     create_validator
+    prepare_bsc_client
     reset_genesis
     prepare_config
     initNetwork
