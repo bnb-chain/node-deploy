@@ -20,7 +20,7 @@ sleepBeforeStart=10
 # stop geth client
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep mine |awk '{print $2}' | xargs kill
+    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
     sleep ${sleepBeforeStart}
 }
 
@@ -37,17 +37,16 @@ function create_validator() {
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
-        cd ${workspace} &&  git submodule update --init --recursive && cd ${workspace}/genesis
+        cd ${workspace} && git submodule update --init --recursive && cd ${workspace}/genesis
         git reset --hard ${GENESIS_COMMIT}
-    else
-        cd ${workspace}/genesis
-        cp genesis-template.json genesis-template.json.bk
-        git stash
-        cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
-        git reset --hard ${GENESIS_COMMIT}
-        mv genesis-template.json.bk genesis-template.json
     fi
-    
+    cd ${workspace}/genesis
+    cp genesis-template.json genesis-template.json.bk
+    git stash
+    cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+    git reset --hard ${GENESIS_COMMIT}
+    mv genesis-template.json.bk genesis-template.json
+
     poetry install --no-root
     npm install
     rm -rf lib/forge-std
@@ -55,7 +54,15 @@ function reset_genesis() {
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
+}
 
+function prepare_bsc_client() {
+    if [ ${useLatestBscClient} = true ]; then
+        if [ ! -d "${workspace}/bsc" ]; then
+            cd ${workspace} && git submodule add https://github.com/bnb-chain/bsc.git bsc
+        fi
+        cd ${workspace}/bsc && make geth && mkdir -p ${workspace}/bin && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/geth
+    fi
 }
 
 function prepare_config() {
@@ -72,6 +79,9 @@ function prepare_config() {
         done
 
         mkdir -p ${workspace}/.local/bsc/node${i}
+        if [ ${EnableSentryNode} = true ]; then
+            mkdir -p ${workspace}/.local/bsc/sentry${i}
+        fi
         cp ${workspace}/keys/password.txt ${workspace}/.local/bsc/node${i}/
         cp ${workspace}/.local/bsc/hardforkTime.txt ${workspace}/.local/bsc/node${i}/
         bbcfee_addrs=${fee_addr}
@@ -114,9 +124,18 @@ function initNetwork() {
     cd ${workspace}
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/bsc/node${i}/geth
-        cp ${workspace}/keys/nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
+        cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/bsc/node${i}/geth/nodekey
+        if [ ${EnableSentryNode} = true ]; then
+            mkdir ${workspace}/.local/bsc/sentry${i}/geth
+            cp ${workspace}/keys/sentry-nodekey${i} ${workspace}/.local/bsc/sentry${i}/geth/nodekey
+        fi
     done
-    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${workspace}/genesis/genesis.json
+    
+    init_extra_args=""
+    if [ ${EnableSentryNode} = true ]; then
+        init_extra_args="--init.sentrynode"
+    fi
+    ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${init_extra_args} ${workspace}/genesis/genesis.json
     rm -f ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/node${i}/config.toml
@@ -133,6 +152,14 @@ function initNetwork() {
             ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
         rm -f ${workspace}/.local/bsc/node${i}/*bsc.log*
+
+        if [ ${EnableSentryNode} = true ]; then
+            sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/sentry${i}/config.toml
+            cp ${workspace}/bin/geth ${workspace}/.local/bsc/sentry${i}/geth${i}
+            initLog=${workspace}/.local/bsc/sentry${i}/init.log
+            ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/sentry${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            rm -f ${workspace}/.local/bsc/sentry${i}/*bsc.log*
+        fi
     done
 }
 
@@ -150,13 +177,18 @@ function native_start() {
             cons_addr="0x$(cat ${j} | jq -r .address)"
         done
 
-        HTTPPort=$((8545 + i))
+        HTTPPort=$((8545 + i*2))
         WSPort=${HTTPPort}
-        MetricsPort=$((6060 + i))
+        MetricsPort=$((6060 + i*2))
+        PProfPort=$((7060 + i*2))
  
         # geth may be replaced
         rm -f ${workspace}/.local/bsc/node${i}/geth${i}
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/node${i}/geth${i}
+
+        if [ ${EnableSentryNode} = true ]; then
+            rm -f ${workspace}/.local/bsc/sentry${i}/geth${i} && cp ${workspace}/bin/geth ${workspace}/.local/bsc/sentry${i}/geth${i}
+        fi
 
         initLog=${workspace}/.local/bsc/node${i}/init.log
         rialtoHash=`cat ${initLog}|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
@@ -173,23 +205,38 @@ function native_start() {
             --unlock ${cons_addr} --miner.etherbase ${cons_addr} --rpc.allow-unprotected-txs --allow-insecure-unlock  \
             --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+            --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
             --gcmode ${gcmode} --syncmode full --mine --vote --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${LastHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             > ${workspace}/.local/bsc/node${i}/bsc-node.log 2>&1 &
+        
+
+        if [ ${EnableSentryNode} = true ]; then
+            nohup  ${workspace}/.local/bsc/sentry${i}/geth${i} --config ${workspace}/.local/bsc/sentry${i}/config.toml \
+                --datadir ${workspace}/.local/bsc/sentry${i} \
+                --nodekey ${workspace}/.local/bsc/sentry${i}/geth/nodekey \
+                --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
+                --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
+                --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
+                --gcmode ${gcmode} --syncmode full \
+                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
+                --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+                > ${workspace}/.local/bsc/sentry${i}/bsc-node.log 2>&1 &
+        fi
     done
 }
 
 function register_stakehub(){
-    if ${needRegister};then
-        echo "sleep 45s to wait feynman enable"
-        sleep 45
-        for ((i = 0; i < size; i++));do
-            ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
-                --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
-        done
-    fi
+    echo "sleep 45s to wait feynman enable"
+    sleep 45
+    for ((i = 0; i < size; i++));do
+        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+            --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
+    done
 }
 
 CMD=$1
@@ -198,11 +245,15 @@ case ${CMD} in
 reset)
     exit_previous
     create_validator
+    prepare_bsc_client
     reset_genesis
     prepare_config
     initNetwork
     native_start
     register_stakehub
+    # to prevent stuck
+    exit_previous
+    native_start
     ;;
 stop)
     exit_previous $ValidatorIdx

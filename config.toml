@@ -10,10 +10,11 @@ TrieDirtyCache = 256
 TriesInMemory = 128
 TrieTimeout = 3600000000000
 EnablePreimageRecording = false
+ValidatorNodeIDsToAdd = []
 
 [Eth.Miner]
 GasCeil = 40000000
-GasPrice = 10000000000
+GasPrice = 1000000000
 Recommit = 10000000000
 DelayLeftOver = 50000000
 
@@ -32,7 +33,7 @@ Locals = []
 NoLocals = true
 Journal = "transactions.rlp"
 Rejournal = 3600000000000
-PriceLimit = 10000000000
+PriceLimit = 1000000000
 PriceBump = 10
 AccountSlots = 16
 GlobalSlots = 4096
@@ -49,6 +50,8 @@ HTTPVirtualHosts = ["*"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
+EnableEVNFeatures = true
+EnableQuickBlockFetching = true
 
 [Node.P2P]
 MaxPeers = 50
@@ -56,6 +59,8 @@ NoDiscovery = false
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
+EVNNodeIdsWhitelist = []
+ProxyedValidatorNodeIDs = []
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000
