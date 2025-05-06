@@ -50,7 +50,7 @@ HTTPVirtualHosts = ["*"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
-EnableBroadcastFeatures = true
+EnableEVNFeatures = true
 EnableQuickBlockFetching = true
 
 [Node.P2P]
@@ -59,7 +59,7 @@ NoDiscovery = false
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
-DirectBroadcastNodeIDs = []
+EVNNodeIdsWhitelist = []
 ProxyedValidatorNodeIDs = []
 
 [Node.HTTPTimeouts]
@@ -72,5 +72,5 @@ FilePath = "bsc.log"
 TimeFormat = "01-02|15:04:05.000"
 MaxBackups = 1000
 MaxBytesSize = 10485760
-Level = "trace"
+Level = "debug"
 FileRoot = ""

@@ -6,5 +6,5 @@
 [submodule "bsc"]
 	path = bsc
 	url = https://github.com/bnb-chain/bsc.git
-	branch = develop_evn
+	branch = develop
 	ignore = dirty
