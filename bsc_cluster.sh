@@ -142,10 +142,10 @@ function initNetwork() {
     
     init_extra_args=""
     if [ ${EnableSentryNode} = true ]; then
-        init_extra_args="--init.sentrynode --init.sentrynode-size ${size} --init.sentrynode-ports 30411"
+        init_extra_args="--init.sentrynode-size ${size} --init.sentrynode-ports 30411"
     fi
     if [ ${EnableFullNode} = true ]; then
-        init_extra_args="${init_extra_args} --init.fullnode --init.fullnode-size 1 --init.fullnode-ports 30511"
+        init_extra_args="${init_extra_args} --init.fullnode-size 1 --init.fullnode-ports 30511"
     fi
     if [ ${RegisterNodeID} = true ] && [ ${EnableSentryNode} = true ]; then
         init_extra_args="${init_extra_args} --init.evn-sentry-register"
