@@ -10,7 +10,7 @@ TrieDirtyCache = 256
 TriesInMemory = 128
 TrieTimeout = 3600000000000
 EnablePreimageRecording = false
-ValidatorNodeIDsToAdd = []
+EVNNodeIDsToAdd = []
 
 [Eth.Miner]
 GasCeil = 40000000
