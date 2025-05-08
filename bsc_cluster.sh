@@ -185,6 +185,7 @@ function initNetwork() {
     done
     if [ ${EnableFullNode} = true ]; then
         sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/fullnode0/config.toml
+        sed -i -e "s/EnableEVNFeatures = true/EnableEVNFeatures = false/g" ${workspace}/.local/bsc/fullnode0/config.toml
         cp ${workspace}/bin/geth ${workspace}/.local/bsc/fullnode0/geth0
         initLog=${workspace}/.local/bsc/fullnode0/init.log
         ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1

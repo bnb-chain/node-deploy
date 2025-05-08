@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/rand"
 	"errors"
+	"flag"
 	"fmt"
 	"math/big"
 	"time"
-	"crypto/rand"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -17,18 +18,19 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 
-	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
 	"github.com/consensys/gnark-crypto/ecc/bls12-381/fr"
+	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
 )
 
 // todo do the same for sending blob transaction
 
-var edpoint = "http://127.0.0.1:8545"
-var chainId = big.NewInt(714)
-
-var account, _ = fromHexKey("59ba8068eb256d520179e903f43dacf6d8d57d72bd306e1bd603fdb8c8da10e8")
-var toAddr = common.HexToAddress("0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186")
-
+var (
+	account, _   = fromHexKey("59ba8068eb256d520179e903f43dacf6d8d57d72bd306e1bd603fdb8c8da10e8")
+	toAddr       = common.HexToAddress("0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186")
+	endpointFlag = flag.String("endpoint", "http://127.0.0.1:8545", "The endpoint of the chain")
+	chainIdFlag  = flag.Int64("chainId", 714, "The chainId of the chain")
+	chainId      *big.Int
+)
 var (
 	emptyBlob          = kzg4844.Blob{}
 	emptyBlobCommit, _ = kzg4844.BlobToCommitment(emptyBlob)
@@ -36,7 +38,9 @@ var (
 )
 
 func main() {
-	c, _ := ethclient.Dial(edpoint)
+	flag.Parse()
+	chainId = big.NewInt(*chainIdFlag)
+	c, _ := ethclient.Dial(*endpointFlag)
 	t := time.NewTicker(200 * time.Millisecond)
 	for {
 		select {
