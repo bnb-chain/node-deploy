@@ -94,6 +94,10 @@ function prepare_config() {
         echo "validatorFee" ${i} ":" ${fee_addr}
         echo "validatorVote" ${i} ":" ${vote_addr}
     done
+
+    if [ ${EnableFullNode} = true ]; then
+        mkdir -p ${workspace}/.local/bsc/fullnode0
+    fi
     rm -f ${workspace}/.local/bsc/hardforkTime.txt
 
     cd ${workspace}/genesis/
@@ -131,10 +135,27 @@ function initNetwork() {
             cp ${workspace}/keys/sentry-nodekey${i} ${workspace}/.local/bsc/sentry${i}/geth/nodekey
         fi
     done
+    if [ ${EnableFullNode} = true ]; then
+        mkdir ${workspace}/.local/bsc/fullnode0/geth
+        cp ${workspace}/keys/fullnode-nodekey0 ${workspace}/.local/bsc/fullnode0/geth/nodekey
+    fi
     
     init_extra_args=""
     if [ ${EnableSentryNode} = true ]; then
-        init_extra_args="--init.sentrynode"
+        init_extra_args="--init.sentrynode-size ${size} --init.sentrynode-ports 30411"
+    fi
+    if [ ${EnableFullNode} = true ]; then
+        init_extra_args="${init_extra_args} --init.fullnode-size 1 --init.fullnode-ports 30511"
+    fi
+    if [ ${RegisterNodeID} = true ] && [ ${EnableSentryNode} = true ]; then
+        init_extra_args="${init_extra_args} --init.evn-sentry-register"
+    elif [ ${RegisterNodeID} = true ]; then
+        init_extra_args="${init_extra_args} --init.evn-validator-register"
+    fi
+    if [ ${EnableEVNWhitelist} = true ] && [ ${EnableSentryNode} = true ]; then
+        init_extra_args="${init_extra_args} --init.evn-sentry-whitelist"
+    elif [ ${EnableEVNWhitelist} = true ]; then
+        init_extra_args="${init_extra_args} --init.evn-validator-whitelist"
     fi
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local/bsc --init.size=${size} --config ${workspace}/config.toml ${init_extra_args} ${workspace}/genesis/genesis.json
     rm -f ${workspace}/*bsc.log*
@@ -162,6 +183,12 @@ function initNetwork() {
             rm -f ${workspace}/.local/bsc/sentry${i}/*bsc.log*
         fi
     done
+    if [ ${EnableFullNode} = true ]; then
+        sed -i -e '/"<nil>"/d' ${workspace}/.local/bsc/fullnode0/config.toml
+        cp ${workspace}/bin/geth ${workspace}/.local/bsc/fullnode0/geth0
+        initLog=${workspace}/.local/bsc/fullnode0/init.log
+        ${workspace}/bin/geth --datadir ${workspace}/.local/bsc/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+    fi
 }
 
 function native_start() {
@@ -229,6 +256,24 @@ function native_start() {
                 > ${workspace}/.local/bsc/sentry${i}/bsc-node.log 2>&1 &
         fi
     done
+
+    if [ ${EnableFullNode} = true ]; then
+        rm -f ${workspace}/.local/bsc/fullnode0/geth0 && cp ${workspace}/bin/geth ${workspace}/.local/bsc/fullnode0/geth0
+    fi
+    if [ ${EnableFullNode} = true ]; then
+        nohup  ${workspace}/.local/bsc/fullnode0/geth0 --config ${workspace}/.local/bsc/fullnode0/config.toml \
+            --datadir ${workspace}/.local/bsc/fullnode0 \
+            --nodekey ${workspace}/.local/bsc/fullnode0/geth/nodekey \
+            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+            --ws.addr 0.0.0.0 --ws.port $((8645)) --http.addr 0.0.0.0 --http.port $((8645)) --http.corsdomain "*" \
+            --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
+            --pprof --pprof.addr localhost --pprof.port $((7160)) \
+            --gcmode ${gcmode} --syncmode full \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
+            --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+            > ${workspace}/.local/bsc/fullnode0/bsc-node.log 2>&1 &
+    fi
 }
 
 function register_stakehub(){
