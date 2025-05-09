@@ -14,7 +14,7 @@ gcmode="full"
 index=0
 extraflags=""
 
-src=${workspace}/.local/bsc/node0
+src=${workspace}/.local/node0
 if [ ! -d "$src" ] ;then
 	echo "you must startup validator firstly..."
 	exit 1
@@ -33,10 +33,10 @@ if [ ! -z "$4" ] ;then
 fi
 
 node=node$index
-dst=${workspace}/.local/bsc/fullnode/${node}
-hardforkfile=${workspace}/.local/bsc/node0/hardforkTime.txt
+dst=${workspace}/.local/fullnode/${node}
+hardforkfile=${workspace}/.local/node0/hardforkTime.txt
 rialtoHash=`cat $src/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
-PassedForkTime=`cat ${workspace}/.local/bsc/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
 LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
 
 mkdir -pv $dst/

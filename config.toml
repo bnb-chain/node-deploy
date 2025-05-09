@@ -13,17 +13,15 @@ EnablePreimageRecording = false
 EVNNodeIDsToAdd = []
 
 [Eth.Miner]
-GasCeil = 40000000
+GasCeil = 35000000
 GasPrice = 1000000000
 Recommit = 10000000000
-DelayLeftOver = 50000000
 
 [Eth.Miner.Mev]
 Enabled = true
 GreedyMergeTx = true
 BuilderFeeCeil= "0"
 ValidatorCommission = 1000
-BidSimulationLeftOver = 50000000
 
 [[Eth.Miner.Mev.Builders]]
 Address = "0x04d63aBCd2b9b1baa327f2Dda0f873F197ccd186"
