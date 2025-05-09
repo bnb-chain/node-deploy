@@ -80,7 +80,7 @@ bash +x ./bsc_fullnode.sh start 3 snap "--pruneancient"
 bash +x ./bsc_fullnode.sh pruneblock 3 snap
 ```
 
-You can see the logs in `.local/bsc/fullnode`.
+You can see the logs in `.local/fullnode`.
 
 Generally, you need to wait for the validator to produce a certain amount of blocks before starting the full/snap syncing test, such as 1000 blocks.
 
