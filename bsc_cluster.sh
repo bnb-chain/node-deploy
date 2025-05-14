@@ -45,13 +45,13 @@ function prepare_bsc_client() {
 # reset genesis, but keep edited genesis-template.json
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
-        cd ${workspace} && git submodule update --init --recursive 
+        cd ${workspace} && git submodule update --init --recursive genesis
         cd ${workspace}/genesis && git reset --hard ${GENESIS_COMMIT}
     fi
     cd ${workspace}/genesis
     cp genesis-template.json genesis-template.json.bk
     git stash
-    cd ${workspace} && git submodule update --remote --recursive && cd ${workspace}/genesis
+    cd ${workspace} && git submodule update --remote --recursive genesis && cd ${workspace}/genesis
     git reset --hard ${GENESIS_COMMIT}
     mv genesis-template.json.bk genesis-template.json
 
@@ -97,13 +97,14 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     git checkout HEAD contracts
-    sed -i -e  's/alreadyInit = true;/turnLength = 4;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
+    sed -i -e  's/alreadyInit = true;/turnLength = 8;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 300) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
     poetry run python -m scripts.generate dev \
-      --epoch "200" \
+      --dev-chain-id "${CHAIN_ID}" \
+      --init-burn-ratio "1000" \
       --init-felony-slash-scope "60" \
       --breathe-block-interval "10 minutes" \
       --block-interval "3 seconds" \
@@ -111,11 +112,13 @@ function prepare_config() {
       --unbond-period "2 minutes" \
       --downtime-jail-time "2 minutes" \
       --felony-jail-time "3 minutes" \
-      --init-voting-delay "1 minutes / BLOCK_INTERVAL" \
+      --misdemeanor-threshold "150" \
+      --felony-threshold "50" \
       --init-voting-period "2 minutes / BLOCK_INTERVAL" \
       --init-min-period-after-quorum "uint64(1 minutes / BLOCK_INTERVAL)" \
       --governor-protector "${INIT_HOLDER}" \
-      --init-minimal-delay "1 minutes"
+      --init-minimal-delay "1 minutes" \
+      --token-recover-portal-protector "${INIT_HOLDER}"
 }
 
 function initNetwork() {
