@@ -50,10 +50,12 @@ function reset_genesis() {
     fi
     cd ${workspace}/genesis
     cp genesis-template.json genesis-template.json.bk
+    cp scripts/init_holders.template scripts/init_holders.template.bk
     git stash
     cd ${workspace} && git submodule update --remote --recursive genesis && cd ${workspace}/genesis
     git reset --hard ${GENESIS_COMMIT}
     mv genesis-template.json.bk genesis-template.json
+    mv scripts/init_holders.template.bk scripts/init_holders.template
 
     poetry install --no-root
     npm install
@@ -283,9 +285,6 @@ reset)
     prepare_config
     initNetwork
     native_start
-    # to prevent stuck
-    exit_previous
-    native_start 
     register_stakehub
     ;;
 stop)
