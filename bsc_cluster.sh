@@ -13,13 +13,13 @@ size=$((BSC_CLUSTER_SIZE))
 stateScheme="hash"
 dbEngine="leveldb"
 gcmode="full"
-sleepBeforeStart=10
+sleepBeforeStart=15
 sleepAfterStart=10
 
 # stop geth client
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill -9
+    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill 9
     sleep ${sleepBeforeStart}
 }
 
