@@ -43,6 +43,7 @@ go build
   You can configure the cluster by modifying the following files:
    - `config.toml`
    - `genesis/genesis-template.json`
+   - `genesis/scripts/init_holders.template`
    - `.env`
 ```
 
