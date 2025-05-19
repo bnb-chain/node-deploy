@@ -114,8 +114,8 @@ function prepare_config() {
       --unbond-period "2 minutes" \
       --downtime-jail-time "2 minutes" \
       --felony-jail-time "3 minutes" \
-      --misdemeanor-threshold "150" \
-      --felony-threshold "50" \
+      --misdemeanor-threshold "50" \
+      --felony-threshold "150" \
       --init-voting-period "2 minutes / BLOCK_INTERVAL" \
       --init-min-period-after-quorum "uint64(1 minutes / BLOCK_INTERVAL)" \
       --governor-protector "${INIT_HOLDER}" \
