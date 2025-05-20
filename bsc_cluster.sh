@@ -128,6 +128,7 @@ function initNetwork() {
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/node${i}/geth
         cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/node${i}/geth/nodekey
+        mv ${workspace}/.local/validator${i}/keystore ${workspace}/.local/node${i}/ && rm -rf ${workspace}/.local/validator${i}
         if [ ${EnableSentryNode} = true ]; then
             mkdir ${workspace}/.local/sentry${i}/geth
             cp ${workspace}/keys/sentry-nodekey${i} ${workspace}/.local/sentry${i}/geth/nodekey
@@ -163,7 +164,6 @@ function initNetwork() {
     rm -f ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/node${i}/config.toml
-        mv ${workspace}/.local/validator${i}/keystore ${workspace}/.local/node${i}/ && rm -rf ${workspace}/.local/validator${i}
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
