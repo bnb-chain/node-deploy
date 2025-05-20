@@ -58,7 +58,7 @@ StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
 EVNNodeIdsWhitelist = []
-ProxyedValidatorNodeIDs = []
+ProxyedValidatorAddresses = []
 
 [Node.HTTPTimeouts]
 ReadTimeout = 30000000000
