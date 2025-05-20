@@ -12,6 +12,7 @@ ExecStop=/server/validator/chaind.sh -stop
 PrivateTmp=true
 LimitNOFILE=10000
 StartLimitInterval=0
+TimeoutStopSec=120
 
 [Install]
 WantedBy=multi-user.target

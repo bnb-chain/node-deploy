@@ -46,16 +46,14 @@ function startChaind() {
 function stopChaind() {
     pid=`ps -ef | grep /server/${workdir}/${bin} | grep -v grep | awk '{print $2}'`
     if [ -n "$pid" ]; then
-        for((i=1;i<=4;i++));
+        kill -TERM $pid
+        for((i=1;i<=40;i++));
         do
-            kill $pid
-            sleep 5
             pid=`ps -ef | grep /server/${workdir}/${bin} | grep -v grep | awk '{print $2}'`
             if [ -z "$pid" ]; then
                 break
-            elif [ $i -eq 4 ]; then
-                kill -9 $pid
             fi
+            sleep 10
         done
     fi
 }

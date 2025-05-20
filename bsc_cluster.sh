@@ -306,6 +306,27 @@ function register_stakehub(){
     done
 }
 
+function remote_reset_config() {
+    rm -rf /mnt/efs/${copyDir}/clusterNetwork
+    cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
+    ips=(${validator_ips_comma//,/ })
+    for ((i=0;i<${#ips[@]};i++));do
+        dst_id=${ips2ids[${ips[i]}]}
+        if [ ${EnableSentryNode} = true ]; then
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/config.toml /server/sentry/"
+	    aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/chaind.sh /server/sentry/"
+        fi
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/config.toml /server/validator/"
+	aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/chaind.sh /server/validator/"
+    done
+     if [ ${EnableFullNode} = true ]; then
+        fullnode_ips=(${fullnode_ips_comma//,/ })
+        dst_id=${ips2ids[${fullnode_ips[0]}]}
+        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/fullnode0/config.toml /server/validator/"
+	aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/fullnode0/chaind.sh /server/validator/"
+    fi
+}
+
 function remote_start() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
@@ -358,7 +379,7 @@ reset)
     reset_genesis
     prepare_config
     initNetwork
-    native_start
+    native_start 
     register_stakehub
     ;;
 stop)
@@ -380,6 +401,13 @@ remote_reset)
     # to prevent stuck
     remote_upgrade
     register_stakehub
+    ;;
+remote_reset_config)
+    create_validator
+    reset_genesis
+    prepare_config
+    initNetwork
+    remote_reset_config
     ;;
 remote_upgrade)
     remote_upgrade
