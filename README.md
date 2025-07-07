@@ -5,7 +5,7 @@
 Before proceeding to the next steps, please ensure that the following packages and softwares are well installed in your local machine: 
 - nodejs: 18.20.2 
 - npm: 6.14.6
-- go: 1.18+
+- go: 1.24+
 - foundry
 - python3 3.12+
 - poetry
@@ -23,14 +23,7 @@ git clone https://github.com/bnb-chain/node-deploy.git
 pip3 install -r requirements.txt
 ```
 
-3. Make `geth` binary files, and put it into `bin/` folder.
-```bash
-git clone https://github.com/bnb-chain/bsc.git
-cd bsc && make geth
-go build -o ./build/bin/bootnode ./cmd/bootnode
-```
-
-4. build `create-validator`
+3. build `create-validator`
 
 ```bash
 # This tool is used to register the validators into StakeHub.
@@ -38,7 +31,7 @@ cd create-validator
 go build
 ```
 
-5. Configure the cluster
+4. Configure the cluster
 ```
   You can configure the cluster by modifying the following files:
    - `config.toml`
@@ -47,7 +40,7 @@ go build
    - `.env`
 ```
 
-6. Setup all nodes.
+5. Setup all nodes.
 two different ways, choose as you like.
 ```bash
 bash -x ./bsc_cluster.sh reset # will reset the cluster and start
@@ -57,7 +50,7 @@ bash -x ./bsc_cluster.sh start [vidx] # only start the cluster
 bash -x ./bsc_cluster.sh restart [vidx] # start the cluster after stopping it
 ```
 
-7. Setup a full node.
+6. Setup a full node.
 If you want to run a full node to test snap/full syncing, you can run:
 
 > Attention: it relies on the validator cluster, so you should set up validators by `bsc_cluster.sh` firstly.

@@ -36,10 +36,10 @@ function create_validator() {
 function prepare_bsc_client() {
     if [ ${useLatestBscClient} = true ]; then
         if [ ! -f "${workspace}/bsc/Makefile" ]; then
-            cd ${workspace} && git submodule update --init bsc
+            cd ${workspace}
+            git clone https://github.com/bnb-chain/bsc.git
         fi
-        git submodule update --remote bsc
-        cd ${workspace}/bsc && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
+        cd ${workspace}/bsc && git pull && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
     fi
 }
 # reset genesis, but keep edited genesis-template.json
