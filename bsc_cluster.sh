@@ -19,7 +19,7 @@ sleepAfterStart=10
 # stop geth client
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
+    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
     sleep ${sleepBeforeStart}
 }
 
@@ -60,7 +60,7 @@ function reset_genesis() {
     poetry install --no-root
     npm install
     rm -rf lib/forge-std
-    forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
+    forge install --no-git foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
@@ -225,7 +225,7 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
@@ -240,7 +240,7 @@ function native_start() {
                 --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
                 --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
                 --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                 >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
@@ -257,7 +257,7 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
