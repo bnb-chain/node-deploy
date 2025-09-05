@@ -1,3 +1,4 @@
 [submodule "genesis"]
 	path = genesis
 	url = https://github.com/simplechain-org/bsc-genesis-contract.git
+	branch = develop/v1.0.1
