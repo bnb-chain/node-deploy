@@ -1,5 +1,0 @@
-[submodule "genesis"]
-	path = genesis
-	url = https://github.com/simplechain-org/bsc-genesis-contract.git
-	branch = master
-	ignore = dirty
