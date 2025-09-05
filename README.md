@@ -3,7 +3,7 @@
 
 ## Installation
 Before proceeding to the next steps, please ensure that the following packages and softwares are well installed in your local machine: 
-- nodejs: 18.20.2 
+- nodejs: v16.15.0
 - npm: 6.14.6
 - go: 1.24+
 - foundry
