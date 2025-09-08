@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  bsc-validator-1:
+    build: .
+    container_name: bsc-validator-1
+    environment:
+      - NODE_TYPE=validator
+      - CONSENSUS_ADDRESS=0x${VALIDATOR_ADDRESS_1}
+    volumes:
+      - ./deployment/validator1:/home/sipc2
+      - ./genesis/genesis.json:/home/sipc2/genesis.json
+      - ./config.toml:/home/sipc2/config.toml
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+      - "30303:30303"
+      - "6060:6060"
+    networks:
+      - bsc-network
+    restart: unless-stopped
+
+  bsc-validator-2:
+    build: .
+    container_name: bsc-validator-2
+    environment:
+      - NODE_TYPE=validator
+      - CONSENSUS_ADDRESS=0x${VALIDATOR_ADDRESS_2}
+    volumes:
+      - ./deployment/validator2:/home/sipc2
+      - ./genesis/genesis.json:/home/sipc2/genesis.json
+      - ./config.toml:/home/sipc2/config.toml
+    ports:
+      - "8645:8545"
+      - "8646:8546"
+      - "31303:30303"
+      - "6160:6060"
+    networks:
+      - bsc-network
+    restart: unless-stopped
+
+  # bsc-fullnode:
+  #   build: .
+  #   container_name: bsc-fullnode
+  #   environment:
+  #     - NODE_TYPE=fullnode
+  #   volumes:
+  #     - ./deployment/fullnode:/home/bsc
+  #     - ./genesis/genesis.json:/home/bsc/genesis.json
+  #     - ./config.toml:/home/bsc/config.toml
+  #   ports:
+  #     - "8745:8545"
+  #     - "8746:8546"
+  #     - "32303:30303"
+  #     - "6260:6060"
+  #   networks:
+  #     - bsc-network
+  #   restart: unless-stopped
+
+networks:
+  bsc-network:
+    driver: bridge

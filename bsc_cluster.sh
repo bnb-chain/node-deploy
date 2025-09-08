@@ -47,23 +47,24 @@ function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
         cd ${workspace} && git submodule update --init --recursive genesis
         cd ${workspace}/genesis && git reset --hard ${GENESIS_COMMIT}
-    fi
-    cd ${workspace}/genesis
-    cp genesis-template.json genesis-template.json.bk
-    cp scripts/init_holders.template scripts/init_holders.template.bk
-    git stash
-    cd ${workspace} && git submodule update --remote --recursive genesis && cd ${workspace}/genesis
-    git reset --hard ${GENESIS_COMMIT}
-    mv genesis-template.json.bk genesis-template.json
-    mv scripts/init_holders.template.bk scripts/init_holders.template
 
-    poetry install --no-root
-    npm install
-    rm -rf lib/forge-std
-    forge install --no-git foundry-rs/forge-std@v1.7.3
-    cd lib/forge-std/lib
-    rm -rf ds-test
-    git clone https://github.com/dapphub/ds-test
+        cd ${workspace}/genesis
+        cp genesis-template.json genesis-template.json.bk
+        cp scripts/init_holders.template scripts/init_holders.template.bk
+        git stash
+        cd ${workspace} && git submodule update --remote --recursive genesis && cd ${workspace}/genesis
+        git reset --hard ${GENESIS_COMMIT}
+        mv genesis-template.json.bk genesis-template.json
+        mv scripts/init_holders.template.bk scripts/init_holders.template
+
+        poetry install --no-root
+        npm install
+        rm -rf lib/forge-std
+        forge install --no-git foundry-rs/forge-std@v1.7.3
+        cd lib/forge-std/lib
+        rm -rf ds-test
+        git clone https://github.com/dapphub/ds-test
+    fi
 }
 
 function prepare_config() {
@@ -257,7 +258,6 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
@@ -297,7 +297,12 @@ restart)
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
     ;;
+regen-genesis)
+    create_validator
+    reset_genesis
+    prepare_config
+    ;;
 *)
-    echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx]"
+    echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx] | regen-genesis"
     ;;
 esac
