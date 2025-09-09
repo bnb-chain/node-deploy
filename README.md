@@ -7,7 +7,7 @@ Before proceeding to the next steps, please ensure that the following packages a
 - npm: 6.14.6
 - go: 1.24+
 - foundry
-- python3 3.12+
+- python3 3.12.x
 - poetry
 - jq
 
@@ -56,22 +56,20 @@ If you want to run a full node to test snap/full syncing, you can run:
 > Attention: it relies on the validator cluster, so you should set up validators by `bsc_cluster.sh` firstly.
 
 ```bash
-# start a full sync node0
-bash +x ./bsc_fullnode.sh start 0 full
-# start a snap sync node1
-bash +x ./bsc_fullnode.sh start 1 snap
+# reset a full sync node0
+bash +x ./bsc_fullnode.sh reset 0 full
+# reset a snap sync node1
+bash +x ./bsc_fullnode.sh reset 1 snap
 # restart the snap sync node1
 bash +x ./bsc_fullnode.sh restart 1 snap
 # stop the snap sync node1
 bash +x ./bsc_fullnode.sh stop 1 snap
 # clean the snap sync node1
 bash +x ./bsc_fullnode.sh clean 1 snap
-# start a snap sync node as fast node
-bash +x ./bsc_fullnode.sh start 2 snap "--tries-verify-mode none"
-# start a snap sync node with prune ancient
-bash +x ./bsc_fullnode.sh start 3 snap "--pruneancient"
-# start pruneblock for a node
-bash +x ./bsc_fullnode.sh pruneblock 3 snap
+# reset a full sync node as fast node
+bash +x ./bsc_fullnode.sh reset 2 full "--tries-verify-mode none"
+# reset a snap sync node with prune ancient
+bash +x ./bsc_fullnode.sh reset 3 snap "--pruneancient"
 ```
 
 You can see the logs in `.local/fullnode`.
