@@ -16,10 +16,24 @@ gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
 
-# stop geth client
+# stop geth client and reth-bsc
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
+    if [ ! -z $ValIdx ]; then
+        if [ $ValIdx -eq 1 ]; then
+            # Stop reth-bsc for node1
+            ps -ef | grep reth-bsc | grep -v grep | awk '{print $2}' | xargs -r kill
+        else
+            # Stop geth for other nodes
+            ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
+        fi
+    else
+        # Stop all nodes
+        ps -ef | grep reth-bsc | grep -v grep | awk '{print $2}' | xargs -r kill
+        for ((i = 0; i < size; i++)); do
+            ps -ef  | grep geth$i | grep config |awk '{print $2}' | xargs -r kill
+        done
+    fi
     sleep ${sleepBeforeStart}
 }
 
@@ -60,7 +74,7 @@ function reset_genesis() {
     poetry install --no-root
     npm install
     rm -rf lib/forge-std
-    forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
+    forge install --no-git foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
@@ -169,7 +183,9 @@ function initNetwork() {
         if  [ $i -eq 0 ] ; then
                 ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         elif  [ $i -eq 1 ] ; then
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble --multidatabase ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            # Skip geth init for node1 (reth-bsc), just copy genesis and create a dummy init log
+            cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json
+            echo "reth-bsc init: genesis.json copied for reth-bsc node" > "${initLog}" 2>&1
         else
             ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
@@ -211,24 +227,72 @@ function native_start() {
         MetricsPort=$((6060 + i*2))
         PProfPort=$((7060 + i*2))
  
-        # geth may be replaced
-        cp ${workspace}/bin/geth ${workspace}/.local/node${i}/geth${i}
-        # update `config` in genesis.json
-        # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
-        # run BSC node
-        nohup  ${workspace}/.local/node${i}/geth${i} --config ${workspace}/.local/node${i}/config.toml \
-            --mine --vote --password ${workspace}/.local/node${i}/password.txt --unlock ${cons_addr} --miner.etherbase ${cons_addr} --blspassword ${workspace}/.local/node${i}/password.txt \
-            --datadir ${workspace}/.local/node${i} \
-            --nodekey ${workspace}/.local/node${i}/geth/nodekey \
-            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
-            --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
-            --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
-            --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
+        # Handle reth-bsc for node1, geth for others
+        if [ $i -eq 1 ]; then
+            # Copy and modify genesis.json for reth-bsc with correct fork timing
+            cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json
+            
+            # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except Maxwell at LastHardforkTime
+            jq --arg passedTime "$PassedForkTime" --arg maxwellTime "$LastHardforkTime" '
+                .config.shanghaiTime = ($passedTime | tonumber) |
+                .config.keplerTime = ($passedTime | tonumber) |
+                .config.feynmanTime = ($passedTime | tonumber) |
+                .config.feynmanFixTime = ($passedTime | tonumber) |
+                .config.cancunTime = ($passedTime | tonumber) |
+                .config.haberTime = ($passedTime | tonumber) |
+                .config.haberFixTime = ($passedTime | tonumber) |
+                .config.lorentzTime = ($passedTime | tonumber) |
+                .config.maxwellTime = ($maxwellTime | tonumber) |
+                .config.bohrTime = ($passedTime | tonumber) |
+                .config.tychoTime = ($passedTime | tonumber) |
+                .config.pragueTime = ($passedTime | tonumber) |
+                .config.pascalTime = ($passedTime | tonumber)
+            ' ${workspace}/.local/node${i}/genesis.json > ${workspace}/.local/node${i}/genesis_reth.json
+            
+            # Get the first bootnode enode from BootstrapNodes configuration
+            # Extract the complete first bootnode entry (including the full enode:// URL)
+            bootnode_enode=$(grep "BootstrapNodes" ${workspace}/.local/node2/config.toml 2>/dev/null | sed 's/.*\[\s*"//;s/".*//;q')
+            
+            # If we can't find it in the config, use the default first entry
+            if [ -z "$bootnode_enode" ]; then
+                bootnode_enode="enode://b78cba3067e3043e0d6b72931c29ae463c10533b149bdc23de54304cacf5f434e903ae2b8d4485f1ad103e6882301a77f03b679a51e169ab4afcab635cb614c2@127.0.0.1:30311"
+            fi
+            
+            # Run reth-bsc node
+            nohup env RUST_LOG=debug ${RETH_BSC_BINARY_PATH} node \
+                --chain ${workspace}/.local/node${i}/genesis_reth.json \
+                --datadir ${workspace}/.local/node${i} \
+                --genesis-hash ${rialtoHash} \
+                --http \
+                --http.addr 0.0.0.0 \
+                --http.port ${HTTPPort} \
+                --ws \
+                --ws.addr 0.0.0.0 \
+                --ws.port $((${WSPort})) \
+                --discovery.addr 0.0.0.0 \
+                --discovery.port $((9999)) \
+                --bootnodes ${bootnode_enode} \
+                >> ${workspace}/.local/node${i}/reth.log 2>&1 &
+        else
+            # geth may be replaced
+            cp ${workspace}/bin/geth ${workspace}/.local/node${i}/geth${i}
+            # update `config` in genesis.json
+            # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
+            # run BSC node
+            nohup  ${workspace}/.local/node${i}/geth${i} --config ${workspace}/.local/node${i}/config.toml \
+                --mine --vote --password ${workspace}/.local/node${i}/password.txt --unlock ${cons_addr} --miner.etherbase ${cons_addr} --blspassword ${workspace}/.local/node${i}/password.txt \
+                --datadir ${workspace}/.local/node${i} \
+                --nodekey ${workspace}/.local/node${i}/geth/nodekey \
+                --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+                --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
+                --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
+                --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
+                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
+                --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+                >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
+        fi
         
         if [ ${EnableSentryNode} = true ]; then
             cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
