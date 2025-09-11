@@ -16,12 +16,61 @@ gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
 
+# Validation function for reth-bsc configuration
+function validate_reth_config() {
+    # Check if RETH_NODE_COUNT is set and valid
+    if [ -z "$RETH_NODE_COUNT" ]; then
+        RETH_NODE_COUNT=0
+        echo "RETH_NODE_COUNT not set, defaulting to 0 (all geth nodes)"
+        return 0
+    fi
+    
+    # Check if RETH_NODE_COUNT is not greater than total cluster size
+    if [ $RETH_NODE_COUNT -gt $size ]; then
+        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be greater than BSC_CLUSTER_SIZE ($size)"
+        echo "Please adjust RETH_NODE_COUNT in .env file to be <= $size"
+        exit 1
+    fi
+    
+    # Check if RETH_NODE_COUNT is negative
+    if [ $RETH_NODE_COUNT -lt 0 ]; then
+        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be negative"
+        echo "Please set RETH_NODE_COUNT to a value between 0 and $size in .env file"
+        exit 1
+    fi
+    
+    # If RETH_NODE_COUNT > 0, check if reth-bsc binary exists and is executable
+    if [ $RETH_NODE_COUNT -gt 0 ]; then
+        if [ -z "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: RETH_BSC_BINARY_PATH is not set in .env file"
+            echo "Please set RETH_BSC_BINARY_PATH to the path of your reth-bsc binary"
+            exit 1
+        fi
+        
+        if [ ! -f "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: reth-bsc binary not found at: $RETH_BSC_BINARY_PATH"
+            echo "Please check the RETH_BSC_BINARY_PATH in .env file and ensure the binary exists"
+            exit 1
+        fi
+        
+        if [ ! -x "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: reth-bsc binary is not executable: $RETH_BSC_BINARY_PATH"
+            echo "Please make the binary executable with: chmod +x $RETH_BSC_BINARY_PATH"
+            exit 1
+        fi
+        
+        echo "✓ Validated: Will run $RETH_NODE_COUNT reth-bsc nodes (node0-node$((RETH_NODE_COUNT-1))) and $((size-RETH_NODE_COUNT)) geth nodes"
+    else
+        echo "✓ Validated: Will run all $size nodes with geth (no reth-bsc nodes)"
+    fi
+}
+
 # stop geth client and reth-bsc
 function exit_previous() {
     ValIdx=$1
     if [ ! -z $ValIdx ]; then
-        if [ $ValIdx -eq 1 ]; then
-            # Stop reth-bsc for node1
+        if [ $ValIdx -lt $RETH_NODE_COUNT ]; then
+            # Stop reth-bsc for reth nodes (first RETH_NODE_COUNT nodes)
             ps -ef | grep reth-bsc | grep -v grep | awk '{print $2}' | xargs -r kill
         else
             # Stop geth for other nodes
@@ -182,10 +231,10 @@ function initNetwork() {
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
                 ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        elif  [ $i -eq 1 ] ; then
-            # Skip geth init for node1 (reth-bsc), just copy genesis and create a dummy init log
+        elif  [ $i -lt $RETH_NODE_COUNT ] ; then
+            # Skip geth init for reth-bsc nodes, just copy genesis and create a dummy init log
             cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json
-            echo "reth-bsc init: genesis.json copied for reth-bsc node" > "${initLog}" 2>&1
+            echo "reth-bsc init: genesis.json copied for reth-bsc node${i}" > "${initLog}" 2>&1
         else
             ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
@@ -205,6 +254,66 @@ function initNetwork() {
         ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/fullnode0/*bsc.log*
     fi
+}
+
+function start_reth_bsc() {
+    local nodeIndex=$1
+    local HTTPPort=$2
+    local WSPort=$3
+    local PassedForkTime=$4
+    local LastHardforkTime=$5
+    local rialtoHash=$6
+    
+    # Copy and modify genesis.json for reth-bsc with correct fork timing
+    cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${nodeIndex}/genesis.json
+    
+    # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except Maxwell at LastHardforkTime
+    jq --arg passedTime "$PassedForkTime" --arg maxwellTime "$LastHardforkTime" '
+        .config.shanghaiTime = ($passedTime | tonumber) |
+        .config.keplerTime = ($passedTime | tonumber) |
+        .config.feynmanTime = ($passedTime | tonumber) |
+        .config.feynmanFixTime = ($passedTime | tonumber) |
+        .config.cancunTime = ($passedTime | tonumber) |
+        .config.haberTime = ($passedTime | tonumber) |
+        .config.haberFixTime = ($passedTime | tonumber) |
+        .config.lorentzTime = ($passedTime | tonumber) |
+        .config.maxwellTime = ($maxwellTime | tonumber) |
+        .config.bohrTime = ($passedTime | tonumber) |
+        .config.tychoTime = ($passedTime | tonumber) |
+        .config.pragueTime = ($passedTime | tonumber) |
+        .config.pascalTime = ($passedTime | tonumber)
+    ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
+    
+    # Get the first bootnode enode from BootstrapNodes configuration
+    # Extract the complete first bootnode entry (including the full enode:// URL)
+    bootnode_enode=$(grep "BootstrapNodes" ${workspace}/.local/node1/config.toml 2>/dev/null | sed 's/.*\[\s*"//;s/".*//;q')
+    
+    # If we can't find it in the config, use the default first entry
+    if [ -z "$bootnode_enode" ]; then
+        bootnode_enode="enode://b78cba3067e3043e0d6b72931c29ae463c10533b149bdc23de54304cacf5f434e903ae2b8d4485f1ad103e6882301a77f03b679a51e169ab4afcab635cb614c2@127.0.0.1:30311"
+    fi
+    
+    # Extract discovery port from the current node's config.toml ListenAddr
+    discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml 2>/dev/null | sed 's/.*:\([0-9]*\).*/\1/')
+    if [ -z "$discovery_port" ]; then
+        discovery_port=$((30311 + nodeIndex))  # Default port based on node index (30311 + i)
+    fi
+    
+    # Run reth-bsc node
+    nohup env RUST_LOG=debug ${RETH_BSC_BINARY_PATH} node \
+        --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
+        --datadir ${workspace}/.local/node${nodeIndex} \
+        --genesis-hash ${rialtoHash} \
+        --http \
+        --http.addr 0.0.0.0 \
+        --http.port ${HTTPPort} \
+        --ws \
+        --ws.addr 0.0.0.0 \
+        --ws.port $((${WSPort})) \
+        --discovery.addr 0.0.0.0 \
+        --discovery.port ${discovery_port} \
+        --bootnodes ${bootnode_enode} \
+        >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
 }
 
 function native_start() {
@@ -227,52 +336,9 @@ function native_start() {
         MetricsPort=$((6060 + i*2))
         PProfPort=$((7060 + i*2))
  
-        # Handle reth-bsc for node1, geth for others
-        if [ $i -eq 1 ]; then
-            # Copy and modify genesis.json for reth-bsc with correct fork timing
-            cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json
-            
-            # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except Maxwell at LastHardforkTime
-            jq --arg passedTime "$PassedForkTime" --arg maxwellTime "$LastHardforkTime" '
-                .config.shanghaiTime = ($passedTime | tonumber) |
-                .config.keplerTime = ($passedTime | tonumber) |
-                .config.feynmanTime = ($passedTime | tonumber) |
-                .config.feynmanFixTime = ($passedTime | tonumber) |
-                .config.cancunTime = ($passedTime | tonumber) |
-                .config.haberTime = ($passedTime | tonumber) |
-                .config.haberFixTime = ($passedTime | tonumber) |
-                .config.lorentzTime = ($passedTime | tonumber) |
-                .config.maxwellTime = ($maxwellTime | tonumber) |
-                .config.bohrTime = ($passedTime | tonumber) |
-                .config.tychoTime = ($passedTime | tonumber) |
-                .config.pragueTime = ($passedTime | tonumber) |
-                .config.pascalTime = ($passedTime | tonumber)
-            ' ${workspace}/.local/node${i}/genesis.json > ${workspace}/.local/node${i}/genesis_reth.json
-            
-            # Get the first bootnode enode from BootstrapNodes configuration
-            # Extract the complete first bootnode entry (including the full enode:// URL)
-            bootnode_enode=$(grep "BootstrapNodes" ${workspace}/.local/node2/config.toml 2>/dev/null | sed 's/.*\[\s*"//;s/".*//;q')
-            
-            # If we can't find it in the config, use the default first entry
-            if [ -z "$bootnode_enode" ]; then
-                bootnode_enode="enode://b78cba3067e3043e0d6b72931c29ae463c10533b149bdc23de54304cacf5f434e903ae2b8d4485f1ad103e6882301a77f03b679a51e169ab4afcab635cb614c2@127.0.0.1:30311"
-            fi
-            
-            # Run reth-bsc node
-            nohup env RUST_LOG=debug ${RETH_BSC_BINARY_PATH} node \
-                --chain ${workspace}/.local/node${i}/genesis_reth.json \
-                --datadir ${workspace}/.local/node${i} \
-                --genesis-hash ${rialtoHash} \
-                --http \
-                --http.addr 0.0.0.0 \
-                --http.port ${HTTPPort} \
-                --ws \
-                --ws.addr 0.0.0.0 \
-                --ws.port $((${WSPort})) \
-                --discovery.addr 0.0.0.0 \
-                --discovery.port $((9999)) \
-                --bootnodes ${bootnode_enode} \
-                >> ${workspace}/.local/node${i}/reth.log 2>&1 &
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            start_reth_bsc $i $HTTPPort $WSPort $PassedForkTime $LastHardforkTime $rialtoHash
         else
             # geth may be replaced
             cp ${workspace}/bin/geth ${workspace}/.local/node${i}/geth${i}
@@ -342,6 +408,7 @@ CMD=$1
 ValidatorIdx=$2
 case ${CMD} in
 reset)
+    validate_reth_config
     exit_previous
     create_validator
     prepare_bsc_client
@@ -352,12 +419,15 @@ reset)
     register_stakehub
     ;;
 stop)
+    validate_reth_config
     exit_previous $ValidatorIdx
     ;;
 start)
+    validate_reth_config
     native_start $ValidatorIdx
     ;;
 restart)
+    validate_reth_config
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
     ;;
