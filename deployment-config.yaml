@@ -1,0 +1,121 @@
+# BSC Cluster Deployment Configuration
+deployment:
+  name: "simple-chain"
+  version: "1.0.0"
+  chain_id: 1914
+
+# Cluster configuration
+cluster:
+  size: 1
+  enable_sentry_nodes: false
+  enable_full_nodes: false
+
+# Docker configuration
+docker:
+  image_name: "nickwest-zkp/simplechain-v2"
+  image_tag: "latest"
+  registry: "ghcr.io"  # Use GitHub Container Registry
+
+# Server cluster configuration
+servers:
+  - name: "validator-1"
+    host: "192.168.3.205"
+    user: "ubuntu"
+    ssh_key: "~/.ssh/id_ed25519"
+    role: "validator"
+    node_index: 0
+    ports:
+      http: 8545
+      ws: 8546
+      p2p: 30303
+      metrics: 6060
+
+  # - name: "validator-2"
+  #   host: "192.168.3.209"
+  #   user: "ubuntu"
+  #   ssh_key: "~/.ssh/id_ed25519"
+  #   role: "validator"
+  #   node_index: 1
+  #   ports:
+  #     http: 8545
+  #     ws: 8546
+  #     p2p: 30303
+  #     metrics: 6060
+
+  # - name: "validator-3"
+  #   host: "192.168.1.103"
+  #   user: "ubuntu"
+  #   ssh_key: "~/.ssh/id_rsa"
+  #   role: "validator"
+  #   node_index: 2
+  #   ports:
+  #     http: 8745
+  #     ws: 8746
+  #     p2p: 32303
+  #     metrics: 6260
+
+  # - name: "validator-4"
+  #   host: "192.168.1.104"
+  #   user: "ubuntu"
+  #   ssh_key: "~/.ssh/id_rsa"
+  #   role: "validator"
+  #   node_index: 3
+  #   ports:
+  #     http: 8845
+  #     ws: 8846
+  #     p2p: 33303
+  #     metrics: 6360
+
+  # - name: "sentry-1"
+  #   host: "192.168.1.105"
+  #   user: "ubuntu"
+  #   ssh_key: "~/.ssh/id_rsa"
+  #   role: "sentry"
+  #   node_index: 0
+  #   ports:
+  #     http: 8945
+  #     ws: 8946
+  #     p2p: 34303
+  #     metrics: 6460
+
+  # - name: "fullnode-1"
+  #   host: "192.168.1.106"
+  #   user: "ubuntu"
+  #   ssh_key: "~/.ssh/id_rsa"
+  #   role: "fullnode"
+  #   node_index: 0
+  #   ports:
+  #     http: 9045
+  #     ws: 9046
+  #     p2p: 35303
+  #     metrics: 6560
+
+# File distribution configuration
+files:
+  genesis: "genesis/genesis.json"
+  config: "config.toml"
+  keys_base: "keys"
+  deployment_base: "deployment"
+
+# Deployment options
+options:
+  skip_build: true    # Skip Docker build since we use pre-built image from ghcr.io
+  skip_distribution: false  # Still need to distribute config and keys
+  regenerate_genesis: true   # Regenerate genesis.json before deployment
+  regenerate_configs: true   # Regenerate config.toml for each server
+  clean_before_deploy: true
+  parallel_deployment: true
+  max_parallel: 5
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus_port: 9090
+  grafana_port: 3000
+
+# Logging configuration
+logging:
+  level: "info"
+  format: "json"
+  rotate_size: "10M"
+  max_backups: 5
