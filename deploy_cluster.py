@@ -10,11 +10,14 @@ import paramiko
 import argparse
 import subprocess
 import time
+import secrets
+import json
 from pathlib import Path
 from typing import Dict, List, Any
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from file_distributor import FileDistributor
+from eth_account import Account
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -30,6 +33,133 @@ class BSCClusterDeployer:
         """Load deployment configuration from YAML file"""
         with open(config_path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
+
+    def _ensure_dir(self, path: str):
+        os.makedirs(path, exist_ok=True)
+
+    def _write_text_file(self, path: str, content: str):
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    def _generate_password(self) -> str:
+        return secrets.token_urlsafe(24)
+
+    def _ensure_password_file(self, keys_base_dir: str) -> str:
+        password_path = os.path.join(keys_base_dir, 'password.txt')
+        if not os.path.exists(password_path):
+            password = self._generate_password()
+            self._write_text_file(password_path, password)
+            logger.info(f"Generated new password file: {password_path}")
+        return password_path
+
+    def _generate_nodekey(self, target_path: str):
+        if os.path.exists(target_path):
+            logger.info(f"Nodekey already exists: {target_path}")
+            return
+        key_bytes = secrets.token_bytes(32)
+        key_hex = key_bytes.hex()
+        self._write_text_file(target_path, key_hex)
+        logger.info(f"Generated nodekey: {target_path}")
+
+    def _generate_eth_keystore(self, out_dir: str, password: str) -> str:
+        """Generate an Ethereum account keystore JSON in out_dir; returns address."""
+        self._ensure_dir(out_dir)
+        acct = Account.create()
+        keystore = Account.encrypt(acct.key, password)
+        filename = f"UTC--{time.strftime('%Y-%m-%dT%H-%M-%SZ', time.gmtime())}--{acct.address.lower().replace('0x','')}"
+        keystore_path = os.path.join(out_dir, filename)
+        with open(keystore_path, 'w', encoding='utf-8') as f:
+            json.dump(keystore, f)
+        logger.info(f"Generated keystore: {keystore_path}")
+        return acct.address
+
+    def generate_keys_for_server(self, server_config: Dict[str, Any]) -> bool:
+        """Generate required keys locally for a server if missing."""
+        try:
+            current_dir = Path(__file__).resolve().parent
+            keys_base = os.path.join(current_dir, self.config['files']['keys_base'])
+            node_index = server_config['node_index']
+            role = server_config['role']
+
+            # Ensure base dir
+            self._ensure_dir(keys_base)
+
+            # Ensure password file
+            password_path = self._ensure_password_file(keys_base)
+            with open(password_path, 'r', encoding='utf-8') as f:
+                password = f.read().strip()
+
+            # Generate role-specific nodekey
+            nodekey_filename = None
+            if role == 'validator':
+                nodekey_filename = f"validator-nodekey{node_index}"
+            elif role == 'sentry':
+                nodekey_filename = f"sentry-nodekey{node_index}"
+            elif role == 'fullnode':
+                nodekey_filename = f"fullnode-nodekey{node_index}"
+            else:
+                logger.warning(f"Unknown role {role}; skipping nodekey generation")
+
+            if nodekey_filename:
+                self._generate_nodekey(os.path.join(keys_base, nodekey_filename))
+
+            if role == 'validator':
+                # Operator and consensus keystores
+                operator_keystore_dir = os.path.join(keys_base, f"validator{node_index}", "keystore")
+                consensus_keystore_dir = os.path.join(keys_base, f"consensus{node_index}", "keystore")
+                if not os.path.isdir(operator_keystore_dir) or not os.listdir(operator_keystore_dir):
+                    self._generate_eth_keystore(operator_keystore_dir, password)
+                else:
+                    logger.info(f"Operator keystore exists: {operator_keystore_dir}")
+                if not os.path.isdir(consensus_keystore_dir) or not os.listdir(consensus_keystore_dir):
+                    self._generate_eth_keystore(consensus_keystore_dir, password)
+                else:
+                    logger.info(f"Consensus keystore exists: {consensus_keystore_dir}")
+
+                # Ensure BLS directory (place wallet files if required externally)
+                bls_dir = os.path.join(keys_base, f"bls{node_index}")
+                self._ensure_dir(bls_dir)
+
+            return True
+        except Exception as e:
+            logger.error(f"Failed to generate keys for server {server_config['name']}: {e}")
+            return False
+
+    def add_node(self, server_name: str, update_peers_config: bool = True) -> bool:
+        """Add a new node: generate keys, distribute files/config, and start the node."""
+        try:
+            servers = self.config['servers']
+            target = None
+            for s in servers:
+                if s['name'] == server_name:
+                    target = s
+                    break
+            if target is None:
+                logger.error(f"Server not found in config: {server_name}")
+                return False
+
+            # 1) Generate keys for the new server
+            if not self.generate_keys_for_server(target):
+                return False
+
+            # 2) Distribute files: update configs for all servers if requested, else only target
+            if update_peers_config:
+                logger.info("Updating configs for all servers to include new static/trusted nodes...")
+                for s in servers:
+                    if not self.distributor.distribute_files_to_server(s):
+                        logger.warning(f"Failed distributing to {s['name']}")
+            else:
+                if not self.distributor.distribute_files_to_server(target):
+                    return False
+
+            # 3) Deploy the new server
+            return self.deploy_to_server(target)
+        except Exception as e:
+            logger.error(f"Add node failed: {e}")
+            return False
 
     def create_ssh_client(self, server_config: Dict[str, Any]) -> paramiko.SSHClient:
         """Create SSH client for server connection"""
@@ -120,15 +250,18 @@ class BSCClusterDeployer:
             # Create SSH client
             ssh_client = self.create_ssh_client(server_config)
 
-            # Create remote directories (use user home directory instead of /opt)
+            # Create remote directories (per-node isolation)
             remote_base = f"{current_dir}/sipc2/{server_name}"
             self.distributor.ensure_remote_directory(ssh_client, remote_base)
             self.distributor.ensure_remote_directory(ssh_client, f"{remote_base}/data")
+            self.distributor.ensure_remote_directory(ssh_client, f"{remote_base}/keys")
+            self.distributor.ensure_remote_directory(ssh_client, f"{remote_base}/config")
 
             # Generate Docker run command with correct validator address
             docker_cmd = self.generate_docker_run_command(server_config, validator_address)
             print(docker_cmd)
-            data_dir = f"{current_dir}/sipc2/{server_name}/data"
+            # Use per-node data directory for cleanup
+            data_dir = f"{remote_base}/data"
             # Create deployment script
             if role == 'validator':
                 deployment_script = f"""#!/bin/bash
@@ -211,9 +344,10 @@ echo "BSC {role} node deployment completed on {server_name}"
 
             # If this is a validator node, register and stake tokens
             if role == 'validator':
-                logger.info(f"Validator node deployed, proceeding with staking registration for {server_name}")
-                if not self.register_validator_stake(server_config, ssh_client, validator_address):
-                    logger.warning(f"Staking registration failed for {server_name}, but deployment was successful")
+                if os.path.isdir(f"{current_dir}/sipc2/{server_name}/keys/validator"):
+                    logger.info(f"Validator node deployed, proceeding with staking registration for {server_name}")
+                    if not self.register_validator_stake(server_config, ssh_client, validator_address):
+                        logger.warning(f"Staking registration failed for {server_name}, but deployment was successful")
 
             logger.info(f"Deployment completed successfully on {server_name}")
             ssh_client.close()
@@ -246,11 +380,11 @@ echo "BSC {role} node deployment completed on {server_name}"
         # Generate port mappings
         ports = server_config['ports']
         port_mappings = [
-            f"-p {ports['http']}:8545",      # HTTP port
-            f"-p {ports['ws']}:8546",        # WebSocket port
-            f"-p {ports['p2p']}:30303",      # P2P port
-            f"-p {ports['metrics']}:6060",   # Metrics port
-            f"-p 7060:6060"                  # PProf port (mapped to metrics port)
+            f"-p {ports['http']}:8545",            # HTTP port (TCP)
+            f"-p {ports['ws']}:8546",              # WebSocket port (TCP)
+            f"-p {ports['p2p']}:30303",            # P2P TCP
+            f"-p {ports['p2p']}:30303/udp",        # P2P UDP for discovery
+            f"-p {ports['metrics']}:6060"          # Metrics/PProf port (TCP)
         ]
 
         # Generate volume mappings (match docker-entrypoint.sh paths)
@@ -270,20 +404,17 @@ echo "BSC {role} node deployment completed on {server_name}"
         if role == 'validator':
             # Add nodekey mapping
             nodekey_path = f"{remote_base}/keys/validator-nodekey"
-            if os.path.exists(nodekey_path):
-                volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
+            volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
 
         elif role == 'sentry':
             # Add nodekey mapping for sentry
             nodekey_path = f"{remote_base}/keys/sentry-nodekey"
-            if os.path.exists(nodekey_path):
-                volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
+            volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
 
         elif role == 'fullnode':
             # Add nodekey mapping for fullnode
             nodekey_path = f"{remote_base}/keys/fullnode-nodekey"
-            if os.path.exists(nodekey_path):
-                volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
+            volume_mappings.append(f"-v {nodekey_path}:/home/sipc2/keys/nodekey")
 
         # Build Docker run command with native_start parameters
         if role == 'validator':
@@ -303,12 +434,12 @@ echo "BSC {role} node deployment completed on {server_name}"
                 f"--miner.etherbase {validator_address} --blspassword /home/sipc2/keys/password.txt",
                 "--nodekey /home/sipc2/keys/nodekey",
                 "--blswallet /home/sipc2/keys/bls/wallet",
-                "--keystore /home/sipc2/keys/validator/keystore",
+                "--keystore /home/sipc2/keys/consensus/keystore",
                 "--rpc.allow-unprotected-txs --allow-insecure-unlock",
                 "--ws.addr 0.0.0.0 --ws.port 8546 --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain '*'",
                 "--metrics --metrics.addr localhost --metrics.port 6060 --metrics.expensive",
                 "--pprof --pprof.addr localhost --pprof.port 6060",
-                "--gcmode archive --syncmode full --monitor.maliciousvote",
+                "--gcmode full --syncmode full --monitor.maliciousvote",
                 "--override.passedforktime 1725500000 --override.lorentz 1725500000 --override.maxwell 1725500000",
                 "--override.immutabilitythreshold 100 --override.breatheblockinterval 300",
                 "--override.minforblobrequest 20 --override.defaultextrareserve 10"
@@ -326,7 +457,7 @@ echo "BSC {role} node deployment completed on {server_name}"
                 "--ws.addr 0.0.0.0 --ws.port 8546 --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain '*'",
                 "--metrics --metrics.addr localhost --metrics.port 6060 --metrics.expensive",
                 "--pprof --pprof.addr localhost --pprof.port 6060",
-                "--gcmode archive --syncmode full",
+                "--gcmode full --syncmode full",
                 "--override.passedforktime 1725500000 --override.lorentz 1725500000 --override.maxwell 1725500000",
                 "--override.immutabilitythreshold 100 --override.breatheblockinterval 300",
                 "--override.minforblobrequest 20 --override.defaultextrareserve 10"
@@ -342,7 +473,7 @@ echo "BSC {role} node deployment completed on {server_name}"
         try:
             # Path to validator keystore directory
             current_dir = Path(__file__).resolve().parent
-            validator_dir = os.path.join(current_dir, f"keys/validator{node_index}/keystore")
+            validator_dir = os.path.join(current_dir, f"keys/consensus{node_index}/keystore")
 
             if not os.path.exists(validator_dir):
                 logger.error(f"Validator keystore directory not found: {validator_dir}")
@@ -387,6 +518,40 @@ echo "BSC {role} node deployment completed on {server_name}"
             return True
 
         try:
+            # Check if BSC_CLUSTER_SIZE in .env matches cluster.size in deployment config
+            cluster_size = self.config['cluster']['size']
+            env_file_path = ".env"
+            
+            if os.path.exists(env_file_path):
+                # Read .env file
+                with open(env_file_path, 'r') as f:
+                    env_content = f.read()
+                
+                # Extract BSC_CLUSTER_SIZE from .env
+                import re
+                match = re.search(r'BSC_CLUSTER_SIZE=(\d+)', env_content)
+                if match:
+                    env_cluster_size = int(match.group(1))
+                    
+                    # If they don't match, update .env file
+                    if env_cluster_size != cluster_size:
+                        logger.info(f"Updating BSC_CLUSTER_SIZE in .env from {env_cluster_size} to {cluster_size}")
+                        # Replace the BSC_CLUSTER_SIZE line
+                        env_content = re.sub(
+                            r'BSC_CLUSTER_SIZE=\d+', 
+                            f'BSC_CLUSTER_SIZE={cluster_size}', 
+                            env_content
+                        )
+                        
+                        # Write back to .env file
+                        with open(env_file_path, 'w') as f:
+                            f.write(env_content)
+                        logger.info(".env file updated successfully")
+                else:
+                    logger.warning("BSC_CLUSTER_SIZE not found in .env file")
+            else:
+                logger.warning(".env file not found")
+
             if regenerate_genesis:
                 logger.info("Regenerating genesis.json and base config...")
 
@@ -405,7 +570,6 @@ echo "BSC {role} node deployment completed on {server_name}"
                 print("STDOUT:", result.stdout)
                 if result.stderr:
                     print("STDERR:", result.stderr)
-                #result = subprocess.run(["bash", "bsc_cluster.sh regen-genesis"], capture_output=True, text=True, cwd=".")
                 if result.returncode != 0:
                     logger.error(f"Failed to regenerate genesis: {result.stderr}")
                     return False
@@ -443,7 +607,8 @@ echo "Executing validator registration using native create-validator..."
 echo "Validator address: {validator_address}"
 
 {current_dir}/sipc2/{server_name}/create-validator \\
-    --consensus-key-dir {current_dir}/sipc2/{server_name}/keys/validator \\
+    --operator-key-dir {current_dir}/sipc2/{server_name}/keys/validator \\
+    --consensus-key-dir {current_dir}/sipc2/{server_name}/keys/consensus \\
     --vote-key-dir {current_dir}/sipc2/{server_name}/keys \\
     --password-path {current_dir}/sipc2/{server_name}/keys/password.txt \\
     --amount 20001 \\
@@ -592,7 +757,9 @@ fi
 def main():
     parser = argparse.ArgumentParser(description="BSC Cluster Deployer")
     parser.add_argument("--config", default="deployment-config.yaml", help="Path to deployment config file")
-    parser.add_argument("--action", choices=['deploy', 'monitor', 'files'], default='deploy', help="Action to perform")
+    parser.add_argument("--action", choices=['deploy', 'monitor', 'files', 'add-node'], default='deploy', help="Action to perform")
+    parser.add_argument("--server-name", help="Server name (from deployment-config.yaml) for add-node action")
+    parser.add_argument("--no-update-peers-config", action="store_true", help="When adding node, do not refresh configs for all peers")
     parser.add_argument("--skip-build", action="store_true", help="Skip Docker image build")
     parser.add_argument("--skip-distribution", action="store_true", help="Skip file distribution")
     parser.add_argument("--regenerate-genesis", action="store_true", help="Force regenerate genesis.json")
@@ -636,6 +803,11 @@ def main():
             success = True
         elif args.action == 'files':
             success = deployer.distributor.distribute_files()
+        elif args.action == 'add-node':
+            if not args.server_name:
+                logger.error("--server-name is required for add-node action")
+                return 1
+            success = deployer.add_node(args.server_name, update_peers_config=not args.no_update_peers_config)
 
         return 0 if success else 1
 

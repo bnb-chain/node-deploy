@@ -29,11 +29,11 @@ var (
 	consensusKeyDir = flag.String("consensus-key-dir", "", "consensus keys dir")
 	voteKeyDir      = flag.String("vote-key-dir", "", "vote keys dir")
 	passwordPath    = flag.String("password-path", "", "password dir")
+	operatorKeyDir  = flag.String("operator-key-dir", "", "operator keys dir")
 )
 
 func main() {
 	flag.Parse()
-
 	if *consensusKeyDir == "" {
 		panic("consensus-keys-dir is required")
 	}
@@ -42,6 +42,9 @@ func main() {
 	}
 	if *passwordPath == "" {
 		panic("password-path is required")
+	}
+	if *operatorKeyDir == "" {
+		*operatorKeyDir = *consensusKeyDir
 	}
 
 	client, err := ethclient.Dial(*rpcUrl)
@@ -56,9 +59,12 @@ func main() {
 	password := string(bytes.TrimSpace(bz))
 
 	consensusKs := keystore.NewKeyStore(*consensusKeyDir+"/keystore", keystore.StandardScryptN, keystore.StandardScryptP)
+	operatorKs := keystore.NewKeyStore(*operatorKeyDir+"/keystore", keystore.StandardScryptN, keystore.StandardScryptP)
 	consensusAddr := consensusKs.Accounts()[0].Address
-	consensusAcc := accounts.Account{Address: consensusAddr}
-	err = consensusKs.Unlock(consensusAcc, password)
+
+	operatorAddr := operatorKs.Accounts()[0].Address
+	operatorAcc := accounts.Account{Address: operatorAddr}
+	err = operatorKs.Unlock(operatorAcc, password)
 	if err != nil {
 		panic(err)
 	}
@@ -94,7 +100,7 @@ func main() {
 	paddedChainIdBytes := make([]byte, 32)
 	copy(paddedChainIdBytes[32-len(chainId.Bytes()):], chainId.Bytes())
 
-	msgHash := crypto.Keccak256(append(consensusAddr.Bytes(), append(pubKey[:], paddedChainIdBytes...)...))
+	msgHash := crypto.Keccak256(append(operatorAddr.Bytes(), append(pubKey[:], paddedChainIdBytes...)...))
 	req := validatorpb.SignRequest{
 		PublicKey:   pubKey[:],
 		SigningRoot: msgHash,
@@ -114,7 +120,7 @@ func main() {
 		panic(err)
 	}
 
-	nonce, err := client.PendingNonceAt(context.Background(), consensusAddr)
+	nonce, err := client.PendingNonceAt(context.Background(), operatorAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -132,7 +138,7 @@ func main() {
 		Data:     data,
 	})
 
-	signedTx, err := consensusKs.SignTx(consensusAcc, tx, chainId)
+	signedTx, err := operatorKs.SignTx(operatorAcc, tx, chainId)
 	if err != nil {
 		panic(err)
 	}

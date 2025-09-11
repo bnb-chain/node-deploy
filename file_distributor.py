@@ -6,6 +6,8 @@ Distributes necessary files to remote servers for Docker deployment
 
 import os
 import yaml
+import re
+from eth_keys import keys
 import paramiko
 import argparse
 import shutil
@@ -87,14 +89,89 @@ class FileDistributor:
         with open(config_template_path, 'r', encoding='utf-8') as f:
             config_content = f.read()
 
-        # Update config with server-specific values
+        # Update config with server-specific values using regex to be robust to template differences
         ports = server_config['ports']
         chain_id = self.config['deployment']['chain_id']
 
-        # Replace key configuration values
-        config_content = config_content.replace('NetworkId = 56', f'NetworkId = {chain_id}')
-        config_content = config_content.replace('HTTPPort = 8545', f'HTTPPort = {ports["http"]}')
-        config_content = config_content.replace('WSPort = 8546', f'WSPort = {ports["ws"]}')
+        # Replace NetworkId
+        config_content = re.sub(r"(?m)^(\s*NetworkId\s*=\s*)\d+\b", rf"\g<1>{chain_id}", config_content)
+        # Replace HTTPPort
+        config_content = re.sub(r"(?m)^(\s*HTTPPort\s*=\s*)\d+\b", rf"\g<1>{ports['http']}", config_content)
+        # Replace WSPort
+        config_content = re.sub(r"(?m)^(\s*WSPort\s*=\s*)\d+\b", rf"\g<1>{ports['ws']}", config_content)
+
+        # Compute and inject StaticNodes from all peers' nodekeys
+        try:
+            static_nodes: List[str] = []
+            trusted_nodes: List[str] = []
+
+            for peer in self.config['servers']:
+                # Skip self
+                if peer['name'] == server_config['name']:
+                    continue
+
+                peer_nodekey_path = self._resolve_nodekey_path(peer)
+                if not peer_nodekey_path or not os.path.exists(peer_nodekey_path):
+                    logger.warning(f"Nodekey not found for {peer['name']}: {peer_nodekey_path}")
+                    continue
+
+                enode_id_hex = self._derive_enode_id_from_nodekey(peer_nodekey_path)
+                if not enode_id_hex:
+                    logger.warning(f"Failed to derive enode for {peer['name']}")
+                    continue
+
+                # Prefer public_ip if provided
+                peer_ip = peer.get('public_ip', peer['host'])
+                peer_p2p = peer['ports']['p2p']
+                enode_url = f"enode://{enode_id_hex}@{peer_ip}:{peer_p2p}"
+                static_nodes.append(enode_url)
+                trusted_nodes.append(enode_url)
+
+            if static_nodes:
+                static_nodes_literal = "[" + ", ".join([f'\"{u}\"' for u in static_nodes]) + "]"
+
+                # Try to replace existing StaticNodes
+                if re.search(r"(?m)^\s*StaticNodes\s*=\s*\[.*\]", config_content):
+                    config_content = re.sub(
+                        r"(?ms)^(\s*StaticNodes\s*=\s*)\[.*?\]",
+                        rf"\g<1>{static_nodes_literal}",
+                        config_content,
+                    )
+                else:
+                    # Insert under [Node.P2P] section
+                    if "[Node.P2P]" in config_content:
+                        config_content = re.sub(
+                            r"(?ms)(\[Node\.P2P\].*?)(\n\[|\Z)",
+                            lambda m: m.group(1) + f"\nStaticNodes = {static_nodes_literal}\n" + m.group(2),
+                            config_content,
+                        )
+                    else:
+                        # Append at end as fallback
+                        config_content += f"\n[Node.P2P]\nStaticNodes = {static_nodes_literal}\n"
+
+            if trusted_nodes:
+                trusted_nodes_literal = "[" + ", ".join([f'\"{u}\"' for u in trusted_nodes]) + "]"
+
+                # Try to replace existing TrustedNodes
+                if re.search(r"(?m)^\s*TrustedNodes\s*=\s*\[.*\]", config_content):
+                    config_content = re.sub(
+                        r"(?ms)^(\s*TrustedNodes\s*=\s*)\[.*?\]",
+                        rf"\g<1>{trusted_nodes_literal}",
+                        config_content,
+                    )
+                else:
+                    # Insert under [Node.P2P] section
+                    if "[Node.P2P]" in config_content:
+                        config_content = re.sub(
+                            r"(?ms)(\[Node\.P2P\].*?)(\n\[|\Z)",
+                            lambda m: m.group(1) + f"\nTrustedNodes = {trusted_nodes_literal}\n" + m.group(2),
+                            config_content,
+                        )
+                    else:
+                        # Append at end as fallback
+                        config_content += f"\n[Node.P2P]\nTrustedNodes = {trusted_nodes_literal}\n"
+        except Exception as e:
+            logger.error(f"Failed to inject StaticNodes: {e}")
 
         # Generate server-specific config file path
         server_name = server_config['name']
@@ -290,12 +367,14 @@ class FileDistributor:
                 os.makedirs(remote_base, exist_ok=True)
                 os.makedirs(os.path.join(remote_base, "config"), exist_ok=True)
                 os.makedirs(os.path.join(remote_base, "keys"), exist_ok=True)
+                os.makedirs(os.path.join(remote_base, "data"), exist_ok=True)
             else:
                 remote_base = f"{current_dir}/sipc2/{server_name}"
                 if ssh_client:
                     self.ensure_remote_directory(ssh_client, remote_base)
                     self.ensure_remote_directory(ssh_client, f"{remote_base}/config")
                     self.ensure_remote_directory(ssh_client, f"{remote_base}/keys")
+                    self.ensure_remote_directory(ssh_client, f"{remote_base}/data")
                 else:
                     logger.error("SSH client is not available for remote directory creation")
                     return False
@@ -391,13 +470,34 @@ class FileDistributor:
                         if os.path.exists(remote_validator_path) and os.path.isdir(remote_validator_path):
                             import shutil
                             shutil.rmtree(remote_validator_path)
-                        self.upload_directory(None, validator_key_dir, remote_validator_path, server_host)
+                            if os.path.isdir(validator_key_dir):
+                                self.upload_directory(None, validator_key_dir, remote_validator_path, server_host)
+                            else:
+                                self.upload_file(None, validator_key_dir, remote_validator_path, server_host)
                     else:
                         # For remote, remove directory if it exists
                         if ssh_client:
                             ssh_client.exec_command(f"rm -rf {remote_base}/keys/validator")
-                        self.upload_directory(ssh_client, validator_key_dir, f"{remote_base}/keys/validator", server_host)
+                            if os.path.isdir(validator_key_dir):
+                                self.upload_directory(ssh_client, validator_key_dir, f"{remote_base}/keys/validator", server_host)
+                            else:
+                                self.upload_file(ssh_client, validator_key_dir, f"{remote_base}/keys/validator", server_host)
 
+                # Upload consensus keys
+                consensus_key_dir = os.path.join(current_dir, f"{self.config['files']['keys_base']}/consensus{node_index}")
+                if os.path.exists(consensus_key_dir):
+                    remote_consensus_path = os.path.join(remote_base, "keys", "consensus") if is_local else f"{remote_base}/keys/consensus"
+                    if is_local:
+                        # For local, remove directory if it exists
+                        if os.path.exists(remote_consensus_path) and os.path.isdir(remote_consensus_path):
+                            import shutil
+                            shutil.rmtree(remote_consensus_path)
+                        self.upload_directory(None, consensus_key_dir, remote_consensus_path, server_host)
+                    else:
+                        if ssh_client:
+                            ssh_client.exec_command(f"rm -rf {remote_base}/keys/consensus")
+                        self.upload_directory(ssh_client, consensus_key_dir, f"{remote_base}/keys/consensus", server_host)
+                
                 # Upload BLS keys
                 bls_key_dir = os.path.join(current_dir, f"{self.config['files']['keys_base']}/bls{node_index}")
                 if os.path.exists(bls_key_dir):
@@ -456,6 +556,51 @@ class FileDistributor:
         except Exception as e:
             logger.error(f"File distribution failed for {server_name}: {e}")
             return False
+
+    def _resolve_nodekey_path(self, server: Dict[str, Any]) -> str:
+        """Resolve local nodekey path for a server based on role and node_index"""
+        current_dir = Path(__file__).resolve().parent
+        keys_base = self.config['files']['keys_base']
+        node_index = server['node_index']
+        role = server['role']
+
+        if role == 'validator':
+            filename = f"validator-nodekey{node_index}"
+        elif role == 'sentry':
+            filename = f"sentry-nodekey{node_index}"
+        elif role == 'fullnode':
+            filename = f"fullnode-nodekey{node_index}"
+        else:
+            return None
+
+        return os.path.join(current_dir, f"{keys_base}/{filename}")
+
+    def _derive_enode_id_from_nodekey(self, nodekey_path: str) -> str:
+        """Derive enode ID (pubkey hex without 0x) from a devp2p nodekey file"""
+        try:
+            with open(nodekey_path, 'rb') as f:
+                key_bytes = f.read().strip()
+
+            # Nodekey may be hex string or raw 32 bytes
+            if len(key_bytes) > 32:
+                try:
+                    key_hex = key_bytes.decode().strip()
+                    if key_hex.startswith('0x'):
+                        key_hex = key_hex[2:]
+                    key_bytes = bytes.fromhex(key_hex)
+                except Exception:
+                    # Assume it's text but not hex; raise
+                    pass
+
+            if len(key_bytes) != 32:
+                raise ValueError("Invalid nodekey length; expected 32 bytes")
+
+            priv = keys.PrivateKey(key_bytes)
+            pub_bytes = priv.public_key.to_bytes()  # 64 bytes (X||Y)
+            return pub_bytes.hex()
+        except Exception as e:
+            logger.error(f"Failed to derive enode from {nodekey_path}: {e}")
+            return None
 
     def distribute_files(self, parallel: bool = True, max_parallel: int = 5) -> bool:
         """Distribute files to all servers in the cluster"""

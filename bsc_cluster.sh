@@ -23,12 +23,34 @@ function exit_previous() {
     sleep ${sleepBeforeStart}
 }
 
+# Check if validator is a file or directory and handle accordingly
+function handle_validator() {
+    local validator_path=$1
+    local index=$2
+    local target_dir=$3
+    
+    if [ -f "${validator_path}" ]; then
+        # It's a file containing the operator address
+        echo "Validator ${index} is a file, copying operator address file"
+        cp ${validator_path} ${target_dir}/
+    elif [ -d "${validator_path}" ]; then
+        # It's a directory containing the keystore
+        echo "Validator ${index} is a directory, copying keystore directory"
+        cp -r ${validator_path} ${workspace}/.local/
+    else
+        echo "Error: Validator ${index} is neither a file nor a directory"
+        exit 1
+    fi
+}
+
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local
 
     for ((i = 0; i < size; i++)); do
-        cp -r ${workspace}/keys/validator${i} ${workspace}/.local/
+        # Handle validator based on whether it's a file or directory
+        handle_validator "${workspace}/keys/validator${i}" ${i} "${workspace}/.local/validator${i}"
+        cp -r ${workspace}/keys/consensus${i} ${workspace}/.local/
         cp -r ${workspace}/keys/bls${i} ${workspace}/.local/
     done
 }
@@ -74,10 +96,25 @@ function prepare_config() {
     echo "passedHardforkTime "${passedHardforkTime} > ${workspace}/.local/hardforkTime.txt
     initHolders=${INIT_HOLDER}
     for ((i = 0; i < size; i++)); do
-        for f in ${workspace}/.local/validator${i}/keystore/*; do
+        # Check if validator is a file or directory and extract operator address accordingly
+        if [ -f "${workspace}/keys/validator${i}" ]; then
+            # Read operator address from the file
+            operator_addr=$(cat ${workspace}/keys/validator${i})
+        elif [ -d "${workspace}/keys/validator${i}" ]; then
+            # Extract operator address from keystore
+            for f in ${workspace}/keys/validator${i}/keystore/*; do
+                operator_addr="0x$(cat ${f} | jq -r .address)"
+            done
+        else
+            echo "Error: Validator ${i} is neither a file nor a directory"
+            exit 1
+        fi
+        
+        initHolders=${initHolders}","${operator_addr}
+        fee_addr=${operator_addr}
+
+        for f in ${workspace}/.local/consensus${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
-            initHolders=${initHolders}","${cons_addr}
-            fee_addr=${cons_addr}
         done
 
         targetDir=${workspace}/.local/node${i}
@@ -129,7 +166,18 @@ function initNetwork() {
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/node${i}/geth
         cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/node${i}/geth/nodekey
-        mv ${workspace}/.local/validator${i}/keystore ${workspace}/.local/node${i}/ && rm -rf ${workspace}/.local/validator${i}
+        
+        # Handle validator based on whether it's a file or directory
+        if [ -d "${workspace}/.local/validator${i}" ]; then
+            # Old format: validator is a directory with keystore
+            mv ${workspace}/.local/validator${i}/keystore ${workspace}/.local/node${i}/ && rm -rf ${workspace}/.local/validator${i}
+        else
+            # New format: validator is a file with operator address
+            # In this case, we don't need to move anything to node directory
+            rm -rf ${workspace}/.local/validator${i}
+        fi
+        
+        mv ${workspace}/.local/consensus${i}/keystore ${workspace}/.local/node${i}/ && rm -rf ${workspace}/.local/consensus${i}
         if [ ${EnableSentryNode} = true ]; then
             mkdir ${workspace}/.local/sentry${i}/geth
             cp ${workspace}/keys/sentry-nodekey${i} ${workspace}/.local/sentry${i}/geth/nodekey
@@ -266,10 +314,13 @@ function native_start() {
 }
 
 function register_stakehub(){
+    if [ -f "${workspace}/keys/validator${i}" ];then
+        exit 1
+    fi
     # wait feynman enable
     sleep 45
     for ((i = 0; i < size; i++));do
-        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+        ${workspace}/create-validator/create-validator --operator-key-dir ${workspace}/keys/validator${i} --consensus-key-dir ${workspace}/keys/consensus${i} --vote-key-dir ${workspace}/keys/bls${i} \
             --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
     done
 }
