@@ -244,7 +244,6 @@ function native_start() {
                 .config.lorentzTime = ($passedTime | tonumber) |
                 .config.maxwellTime = ($maxwellTime | tonumber) |
                 .config.bohrTime = ($passedTime | tonumber) |
-                .config.tychoTime = ($passedTime | tonumber) |
                 .config.pragueTime = ($passedTime | tonumber) |
                 .config.pascalTime = ($passedTime | tonumber)
             ' ${workspace}/.local/node${i}/genesis.json > ${workspace}/.local/node${i}/genesis_reth.json
@@ -259,10 +258,12 @@ function native_start() {
             fi
             
             # Run reth-bsc node
-            nohup env RUST_LOG=debug ${RETH_BSC_BINARY_PATH} node \
+            nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
                 --chain ${workspace}/.local/node${i}/genesis_reth.json \
                 --datadir ${workspace}/.local/node${i} \
                 --genesis-hash ${rialtoHash} \
+                --mining.enabled \
+                --mining.private-key ${workspace}/.local/node${i}/keystore/UTC--2024-05-10T03-37-36.999615000Z--bbd1acc20bd8304309d31d8fd235210d0efc049d \
                 --http \
                 --http.addr 0.0.0.0 \
                 --http.port ${HTTPPort} \
