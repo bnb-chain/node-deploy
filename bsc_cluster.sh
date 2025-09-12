@@ -300,7 +300,7 @@ function start_reth_bsc() {
     fi
     
     # Run reth-bsc node
-    nohup env RUST_LOG=debug ${RETH_BSC_BINARY_PATH} node \
+    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
