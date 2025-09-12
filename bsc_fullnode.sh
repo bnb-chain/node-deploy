@@ -47,7 +47,8 @@ function init() {
 }
 
 function start() {
-  nohup ${workspace}/bin/geth --config $dst/config.toml --port $(( 31000 + $index ))  \
+  cp ${workspace}/bin/geth $dst/geth-$index-$syncmode
+  nohup $dst/geth-$index-$syncmode --config $dst/config.toml --port $(( 31000 + $index ))  \
   --datadir $dst --rpc.allow-unprotected-txs --allow-insecure-unlock \
   --ws.addr 0.0.0.0 --ws.port $(( 8600 + $index )) --http.addr 0.0.0.0 --http.port $(( 8600 + $index )) --http.corsdomain "*" \
   --metrics --metrics.addr 0.0.0.0 --metrics.port $(( 6100 + $index )) --metrics.expensive \
