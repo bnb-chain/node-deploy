@@ -60,7 +60,7 @@ function reset_genesis() {
     poetry install --no-root
     npm install
     rm -rf lib/forge-std
-    forge install --no-git --no-commit foundry-rs/forge-std@v1.7.3
+    forge install --no-git foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
@@ -221,7 +221,7 @@ function native_start() {
             --datadir ${workspace}/.local/node${i} \
             --nodekey ${workspace}/.local/node${i}/geth/nodekey \
             --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws.addr 0.0.0.0 --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+            --ws --ws.addr 0.0.0.0 --ws.port ${WSPort} --http --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
@@ -236,7 +236,7 @@ function native_start() {
                 --datadir ${workspace}/.local/sentry${i} \
                 --nodekey ${workspace}/.local/sentry${i}/geth/nodekey \
                 --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-                --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
+                --ws --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
                 --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
                 --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
                 --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
@@ -253,7 +253,7 @@ function native_start() {
             --datadir ${workspace}/.local/fullnode0 \
             --nodekey ${workspace}/.local/fullnode0/geth/nodekey \
             --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws.addr 0.0.0.0 --ws.port $((8645)) --http.addr 0.0.0.0 --http.port $((8645)) --http.corsdomain "*" \
+            --ws --ws.addr 0.0.0.0 --ws.port $((8645)) --http --http.addr 0.0.0.0 --http.port $((8645)) --http.corsdomain "*" \
             --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
