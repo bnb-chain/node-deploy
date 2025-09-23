@@ -299,6 +299,9 @@ function start_reth_bsc() {
         discovery_port=$((30311 + nodeIndex))  # Default port based on node index (30311 + i)
     fi
     
+    # Detect keystore path dynamically
+    keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
+    
     # Run reth-bsc node
     nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
@@ -313,6 +316,9 @@ function start_reth_bsc() {
         --discovery.addr 0.0.0.0 \
         --discovery.port ${discovery_port} \
         --bootnodes ${bootnode_enode} \
+        --mining.enabled \
+        --mining.keystore-path ${keystore_path} \
+        --mining.keystore-password ${KEYPASS} \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
 }
 
