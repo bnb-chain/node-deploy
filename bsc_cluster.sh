@@ -225,7 +225,7 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
@@ -240,7 +240,7 @@ function native_start() {
                 --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
                 --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
                 --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                 >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
@@ -257,7 +257,7 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
