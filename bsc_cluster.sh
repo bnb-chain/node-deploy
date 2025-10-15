@@ -302,6 +302,24 @@ function start_reth_bsc() {
     # Detect keystore path dynamically
     keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
     
+    # Determine BLS signer CLI args (prefer CLI over env)
+    # Priority:
+    # 1) BSC_BLS_PRIVATE_KEY -> use direct private key (dev only)
+    # 2) BSC_BLS_KEYSTORE_PATH + BSC_BLS_KEYSTORE_PASSWORD -> use provided keystore
+    # 3) Auto-detected keystore in node dir + KEYPASS from .env
+    bls_keystore_path=$(find ${workspace}/.local/node${nodeIndex}/bls/keystore -name "*.json" -type f | head -1)
+    bls_cli_args=()
+    if [ -n "${BSC_BLS_PRIVATE_KEY}" ]; then
+        bls_cli_args+=(--bls.private-key "${BSC_BLS_PRIVATE_KEY}")
+    elif [ -n "${BSC_BLS_KEYSTORE_PATH}" ] && [ -n "${BSC_BLS_KEYSTORE_PASSWORD}" ]; then
+        bls_cli_args+=(--bls.keystore-path "${BSC_BLS_KEYSTORE_PATH}" --bls.keystore-password "${BSC_BLS_KEYSTORE_PASSWORD}")
+    else
+        if [ -z "${bls_keystore_path}" ]; then
+            echo "WARNING: No BLS keystore found for node${nodeIndex}; reth-bsc may fall back to env if configured" >&2
+        fi
+        bls_cli_args+=(--bls.keystore-path "${bls_keystore_path}" --bls.keystore-password "${KEYPASS}")
+    fi
+    
     # Run reth-bsc node
     nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
@@ -318,7 +336,8 @@ function start_reth_bsc() {
         --bootnodes ${bootnode_enode} \
         --mining.enabled \
         --mining.keystore-path ${keystore_path} \
-        --mining.keystore-password ${KEYPASS} \
+        --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
+        --log.stdout.format log-fmt \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
 }
 
