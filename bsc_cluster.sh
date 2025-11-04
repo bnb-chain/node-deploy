@@ -283,25 +283,31 @@ function start_reth_bsc() {
         .config.pragueTime = ($passedTime | tonumber) |
         .config.pascalTime = ($passedTime | tonumber)
     ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
+
+    if [ ${EnableSentryNode} = true ]; then
+        cp ${workspace}/.local/node${nodeIndex}/genesis_reth.json ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json
+    fi
     
     # Get the first bootnode enode from BootstrapNodes configuration
     # Extract the complete first bootnode entry (including the full enode:// URL)
-    bootnode_enode=$(grep "BootstrapNodes" ${workspace}/.local/node1/config.toml 2>/dev/null | sed 's/.*\[\s*"//;s/".*//;q')
-    
-    # If we can't find it in the config, use the default first entry
-    if [ -z "$bootnode_enode" ]; then
-        bootnode_enode="enode://b78cba3067e3043e0d6b72931c29ae463c10533b149bdc23de54304cacf5f434e903ae2b8d4485f1ad103e6882301a77f03b679a51e169ab4afcab635cb614c2@127.0.0.1:30311"
-    fi
+    bootnode_enode=$(grep -E "BootstrapNodes" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+    staic_enode=$(grep -E "StaticNodes" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
     
     # Extract discovery port from the current node's config.toml ListenAddr
-    discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml 2>/dev/null | sed 's/.*:\([0-9]*\).*/\1/')
-    if [ -z "$discovery_port" ]; then
-        discovery_port=$((30311 + nodeIndex))  # Default port based on node index (30311 + i)
-    fi
+    discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
+    auth_port=8551
     
     # Detect keystore path dynamically
     keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
-    
+    nodekey_path=$(find ${workspace}/.local/node${nodeIndex}/geth/nodekey -type f | head -1)
+    peer_conf=()
+    if [ -n "${bootnode_enode}" ]; then
+        peer_conf+=(--bootnodes ${bootnode_enode})
+    fi
+    if [ -n "${staic_enode}" ]; then
+        peer_conf+=(--trusted-peers ${staic_enode})
+    fi
+
     # Determine BLS signer CLI args (prefer CLI over env)
     # Priority:
     # 1) BSC_BLS_PRIVATE_KEY -> use direct private key (dev only)
@@ -319,26 +325,89 @@ function start_reth_bsc() {
         fi
         bls_cli_args+=(--bls.keystore-path "${bls_keystore_path}" --bls.keystore-password "${KEYPASS}")
     fi
+
+    evn_conf=()
+    if [ ${EnableSentryNode} = true ]; then
+        evn_conf+=(--evn.enabled)
+        add_nodeid=$(grep -E "EVNNodeIDsToAdd" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${add_nodeid}" ]; then
+            evn_conf+=(--evn.add-nodeid ${add_nodeid})
+        fi
+        remove_nodeid=$(grep -E "EVNNodeIDsToRemove" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${remove_nodeid}" ]; then
+            evn_conf+=(--evn.remove-nodeid ${remove_nodeid})
+        fi
+    fi
+    echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
     
     # Run reth-bsc node
-    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+    nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
         --http \
         --http.addr 0.0.0.0 \
         --http.port ${HTTPPort} \
+        --p2p-secret-key ${nodekey_path} \
         --ws \
         --ws.addr 0.0.0.0 \
         --ws.port $((${WSPort})) \
         --discovery.addr 0.0.0.0 \
         --discovery.port ${discovery_port} \
-        --bootnodes ${bootnode_enode} \
+        --authrpc.port ${auth_port} \
+        --port ${discovery_port} \
+        ${peer_conf[@]} \
+        ${evn_conf[@]} \
         --mining.enabled \
         --mining.keystore-path ${keystore_path} \
         --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
         --log.stdout.format log-fmt \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
+    
+    if [ ${EnableSentryNode} = true ]; then
+        discovery_port=$(grep "ListenAddr" ${workspace}/.local/sentry${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
+        nodekey_path=$(find ${workspace}/.local/sentry${i}/geth/nodekey -type f | head -1)
+        bootnode_enode=$(grep -E "BootstrapNodes" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        staic_enode=$(grep -E "StaticNodes" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        peer_conf=()
+        if [ -n "${bootnode_enode}" ]; then
+            peer_conf+=(--bootnodes ${bootnode_enode})
+        fi
+        if [ -n "${staic_enode}" ]; then
+            peer_conf+=(--trusted-peers ${staic_enode})
+        fi
+        evn_conf=()
+        evn_conf+=(--evn.enabled)
+        whitelist_nodeid=$(grep -E "EVNNodeIdsWhitelist" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${whitelist_nodeid}" ]; then
+            evn_conf+=(--evn.whitelist-nodeids ${whitelist_nodeid})
+        fi
+        proxyed_val=$(grep -E "ProxyedValidatorAddresses" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${proxyed_val}" ]; then
+            evn_conf+=(--evn.proxyed-validator ${proxyed_val})
+        fi
+
+        echo "sentry${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
+        nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+            --chain ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json \
+            --datadir ${workspace}/.local/sentry${nodeIndex} \
+            --genesis-hash ${rialtoHash} \
+            --http \
+            --http.addr 0.0.0.0 \
+            --http.port $((HTTPPort+1)) \
+            --p2p-secret-key ${nodekey_path} \
+            --ws \
+            --ws.addr 0.0.0.0 \
+            --ws.port $((WSPort+1)) \
+            --discovery.addr 0.0.0.0 \
+            --discovery.port ${discovery_port} \
+            --authrpc.port $((auth_port+1)) \
+            --port ${discovery_port} \
+            ${peer_conf[@]} \
+            ${evn_conf[@]} \
+            --log.stdout.format log-fmt \
+            >> ${workspace}/.local/sentry${nodeIndex}/reth.log 2>&1 &
+    fi
 }
 
 function native_start() {
@@ -363,6 +432,8 @@ function native_start() {
  
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
+            # TODO: there are not supported flags, may support later
+            # --override.breatheblockinterval --override.minforblobrequest --MetricsPort
             start_reth_bsc $i $HTTPPort $WSPort $PassedForkTime $LastHardforkTime $rialtoHash
         else
             # geth may be replaced
@@ -383,22 +454,22 @@ function native_start() {
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                 >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
-        fi
-        
-        if [ ${EnableSentryNode} = true ]; then
-            cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
-            nohup  ${workspace}/.local/sentry${i}/geth${i} --config ${workspace}/.local/sentry${i}/config.toml \
-                --datadir ${workspace}/.local/sentry${i} \
-                --nodekey ${workspace}/.local/sentry${i}/geth/nodekey \
-                --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-                --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
-                --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
-                --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
-                --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
-                --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
-                --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-                >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
+            
+            if [ ${EnableSentryNode} = true ]; then
+                cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
+                nohup  ${workspace}/.local/sentry${i}/geth${i} --config ${workspace}/.local/sentry${i}/config.toml \
+                    --datadir ${workspace}/.local/sentry${i} \
+                    --nodekey ${workspace}/.local/sentry${i}/geth/nodekey \
+                    --rpc.allow-unprotected-txs --allow-insecure-unlock  \
+                    --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
+                    --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
+                    --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
+                    --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
+                    --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                    --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
+                    --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+                    >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
+            fi
         fi
     done
 
