@@ -70,6 +70,7 @@ case $CMD in
     stopChaind
     ;;
 -restart)
+    echo "restart"
     stopChaind
     sleep 3
     startChaind

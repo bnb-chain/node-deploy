@@ -133,6 +133,7 @@ function reset_genesis() {
 }
 
 function prepare_config() {
+    \cp -f ${RETH_BSC_BINARY_PATH} ${workspace}/bin/reth-bsc
     rm -f ${workspace}/genesis/validators.conf
 
     passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY})
@@ -149,31 +150,58 @@ function prepare_config() {
         mkdir -p ${targetDir} && cd ${targetDir}
         cp ${workspace}/keys/password.txt ./
         cp ${workspace}/.local/hardforkTime.txt ./
-        cp ${workspace}/qa-env-resource/* ./ && rm -f upgrade-single*
-        sed -i -e "s/{{validatorAddr}}/${cons_addr}/g"  chaind.sh && rm -f chaind.sh.bak
+        cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
         bbcfee_addrs=${fee_addr}
         powers="0x000001d1a94a2000" #2000000000000
         mv ${workspace}/.local/bls${i}/bls ./ && rm -rf ${workspace}/.local/bls${i}
         vote_addr=0x$(cat ./bls/keystore/*json | jq .pubkey | sed 's/"//g')
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
-        if [ ${EnableSentryNode} = true ]; then
-            targetDir=${workspace}/.local/sentry${i}
-            mkdir -p ${targetDir} && cd ${targetDir}
-            cp ${workspace}/.local/hardforkTime.txt ./
-            cp ${workspace}/qa-env-resource/* ./ && rm -f upgrade-single*
-            sed -i -e '/--mine/d' chaind.sh
-            sed -i -e 's/workdir="validator"/workdir="sentry"/g' chaind.sh
-            sed -i -e 's/bin="bsc"/bin="sentry"/g' chaind.sh
-            sed -i -e "s/portInc=0/portInc=2/g" chaind.sh
-            rm -f chaind.sh.bak
-            sed -i -e 's/workdir="validator"/workdir="sentry"/g' init.sh
-            sed -i -e 's/bin="bsc"/bin="sentry"/g' init.sh
-            rm -f init.sh.bak
-            mv bsc.service sentry.service
-            sed -i -e 's/validator/sentry/g' sentry.service
-            sed -i -e 's/bsc/sentry/g' sentry.service
-            rm -f sentry.service.bak
+
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            sed -i -e 's/KEYPASS="123456"/KEYPASS="${KEYPASS}"/g' reth-bsc-chaind.sh
+            if [ ${EnableSentryNode} = true ]; then
+                targetDir=${workspace}/.local/sentry${i}
+                mkdir -p ${targetDir} && cd ${targetDir}
+                cp ${workspace}/.local/hardforkTime.txt ./
+                cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
+                sed -i -e 's/KEYPASS="123456"/KEYPASS="${KEYPASS}"/g' reth-bsc-chaind.sh
+                sed -i -e 's/ENABLE_MINING=true/ENABLE_MINING=false/g' reth-bsc-chaind.sh
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-chaind.sh
+                sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-chaind.sh
+                sed -i -e 's/portInc=0/portInc=2/g' reth-bsc-chaind.sh
+                sed -i -e 's/auth_port=8551/auth_port=8552/g' reth-bsc-chaind.sh
+                rm -f reth-bsc-chaind.sh.bak
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-init.sh
+                sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-init.sh
+                rm -f reth-bsc-init.sh.bak
+                mv reth-bsc.service reth-bsc-sentry.service
+                sed -i -e 's/validator/sentry/g' reth-bsc-sentry.service
+                sed -i -e 's/Description=reth-bsc/Description=reth-bsc-sentry/g' reth-bsc-sentry.service
+                rm -f reth-bsc-sentry.service.bak
+            fi
+        else
+            sed -i -e "s/{{validatorAddr}}/${cons_addr}/g"  chaind.sh && rm -f chaind.sh.bak
+            if [ ${EnableSentryNode} = true ]; then
+                targetDir=${workspace}/.local/sentry${i}
+                mkdir -p ${targetDir} && cd ${targetDir}
+                cp ${workspace}/.local/hardforkTime.txt ./
+                cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
+                sed -i -e '/--mine/d' chaind.sh
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' chaind.sh
+                sed -i -e 's/bin="bsc"/bin="sentry"/g' chaind.sh
+                sed -i -e "s/portInc=0/portInc=2/g" chaind.sh
+                rm -f chaind.sh.bak
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' init.sh
+                sed -i -e 's/bin="bsc"/bin="sentry"/g' init.sh
+                rm -f init.sh.bak
+                mv bsc.service sentry.service
+                sed -i -e 's/validator/sentry/g' sentry.service
+                sed -i -e 's/bsc/sentry/g' sentry.service
+                rm -f sentry.service.bak
+            fi
         fi
+
     done
     if [ ${EnableFullNode} = true ]; then
         targetDir=${workspace}/.local/fullnode0
@@ -538,18 +566,29 @@ function remote_reset_config() {
     ips=(${validator_ips_comma//,/ })
     for ((i=0;i<${#ips[@]};i++));do
         dst_id=${ips2ids[${ips[i]}]}
-        if [ ${EnableSentryNode} = true ]; then
-            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/config.toml /server/sentry/"
-	    aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/chaind.sh /server/sentry/"
+        echo "reset config for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/config.toml /server/sentry/"
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/reth-bsc-chaind.sh /server/sentry/"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/config.toml /server/validator/"
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/reth-bsc-chaind.sh /server/validator/"
+        else
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/config.toml /server/sentry/"
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/chaind.sh /server/sentry/"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/config.toml /server/validator/"
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/chaind.sh /server/validator/"
         fi
-        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/config.toml /server/validator/"
-	aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/node${i}/chaind.sh /server/validator/"
     done
-     if [ ${EnableFullNode} = true ]; then
+    if [ ${EnableFullNode} = true ]; then
         fullnode_ips=(${fullnode_ips_comma//,/ })
         dst_id=${ips2ids[${fullnode_ips[0]}]}
         aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/fullnode0/config.toml /server/validator/"
-	aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/fullnode0/chaind.sh /server/validator/"
+	    aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo \cp -f /mnt/efs/${copyDir}/clusterNetwork/fullnode0/chaind.sh /server/validator/"
     fi
 }
 
@@ -557,20 +596,39 @@ function remote_start() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
     for dst_id in ${ips2ids[@]}; do
-        if [ ${EnableSentryNode} = true ]; then
-            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service sentry stop"
+        echo "start node${i}, dst_id: ${dst_id}"
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service reth-bsc-sentry stop"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service reth-bsc stop"
+        else
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service sentry stop"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service bsc stop"
         fi
-        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service bsc stop"
     done
     sleep 100
     cp ${workspace}/bin/geth /mnt/efs/${copyDir}/clusterNetwork/
+    cp ${workspace}/bin/reth-bsc /mnt/efs/${copyDir}/clusterNetwork/
     ips=(${validator_ips_comma//,/ })
     for ((i=0;i<${#ips[@]};i++));do
         dst_id=${ips2ids[${ips[i]}]}
-        if [ ${EnableSentryNode} = true ]; then
-            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/init.sh"
+        echo "start for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/reth-bsc-init.sh"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/node${i}/reth-bsc-init.sh"
+        else
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/init.sh"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/node${i}/init.sh"
         fi
-        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/node${i}/init.sh"
     done
     if [ ${EnableFullNode} = true ]; then
         fullnode_ips=(${fullnode_ips_comma//,/ })
@@ -583,15 +641,26 @@ function remote_upgrade() {
     cp ${workspace}/bin/geth /mnt/efs/${copyDir}/clusterNetwork/
     if [ ${EnableSentryNode} = true ]; then
         cp ${workspace}/qa-env-resource/upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
+        cp ${workspace}/qa-env-resource/reth-bsc-upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
     fi
     cp ${workspace}/qa-env-resource/upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
+    cp ${workspace}/qa-env-resource/reth-bsc-upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
     for dst_id in ${ips2ids[@]}; do
-        if [ ${EnableSentryNode} = true ]; then
+        echo "upgrade config for node${i}, dst_id: ${dst_id}"
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc-upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/reth-bsc-upgrade-single-sentry.sh"
+            fi
+            aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc-upgrade-single-validator.sh /tmp/ && sudo bash -x /tmp/reth-bsc-upgrade-single-validator.sh"
+        else
+            if [ ${EnableSentryNode} = true ]; then
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
+                --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo cp /mnt/efs/${copyDir}/clusterNetwork/upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/upgrade-single-sentry.sh"
+            fi
             aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
-            --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo cp /mnt/efs/${copyDir}/clusterNetwork/upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/upgrade-single-sentry.sh"
+                --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo cp /mnt/efs/${copyDir}/clusterNetwork/upgrade-single-validator.sh /tmp/ && sudo bash -x /tmp/upgrade-single-validator.sh"
         fi
-        aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
-            --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo cp /mnt/efs/${copyDir}/clusterNetwork/upgrade-single-validator.sh /tmp/ && sudo bash -x /tmp/upgrade-single-validator.sh"
     done
 }
 

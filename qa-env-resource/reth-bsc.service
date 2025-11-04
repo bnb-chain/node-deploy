@@ -1,0 +1,18 @@
+[Unit]
+Description=reth-bsc
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/server/validator/reth-bsc-chaind.sh -start
+ExecReload=/server/validator/reth-bsc-chaind.sh -restart
+ExecStop=/server/validator/reth-bsc-chaind.sh -stop
+PrivateTmp=true
+LimitNOFILE=10000
+StartLimitInterval=0
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
