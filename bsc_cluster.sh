@@ -159,13 +159,13 @@ function prepare_config() {
 
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
-            sed -i -e 's/KEYPASS="123456"/KEYPASS="${KEYPASS}"/g' reth-bsc-chaind.sh
+            sed -i -e "s/KEYPASS=\"123456\"/KEYPASS=\"${KEYPASS}\"/g" reth-bsc-chaind.sh
             if [ ${EnableSentryNode} = true ]; then
                 targetDir=${workspace}/.local/sentry${i}
                 mkdir -p ${targetDir} && cd ${targetDir}
                 cp ${workspace}/.local/hardforkTime.txt ./
                 cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
-                sed -i -e 's/KEYPASS="123456"/KEYPASS="${KEYPASS}"/g' reth-bsc-chaind.sh
+                sed -i -e "s/KEYPASS=\"123456\"/KEYPASS=\"${KEYPASS}\"/g" reth-bsc-chaind.sh
                 sed -i -e 's/ENABLE_MINING=true/ENABLE_MINING=false/g' reth-bsc-chaind.sh
                 sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-chaind.sh
                 sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-chaind.sh
