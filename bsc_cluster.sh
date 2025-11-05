@@ -553,7 +553,6 @@ function native_start() {
 
 function register_stakehub(){
     # wait feynman enable
-    sleep 100
     for ((i = 0; i < size; i++));do
         ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
             --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
@@ -675,7 +674,8 @@ reset)
     reset_genesis
     prepare_config
     initNetwork
-    native_start 
+    native_start
+    sleep 100
     register_stakehub
     ;;
 stop)
