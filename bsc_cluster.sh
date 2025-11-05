@@ -283,7 +283,7 @@ function initNetwork() {
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
-                ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         elif  [ $i -lt $RETH_NODE_COUNT ] ; then
             # Skip geth init for reth-bsc nodes, just copy genesis and create a dummy init log
             cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json

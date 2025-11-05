@@ -21,7 +21,7 @@ function startChaind() {
     PassedForkTime=`cat ${workspace}/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
     initLog=${workspace}/init.log
-    rialtoHash=`cat ${initLog}|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+    # rialtoHash=`cat ${initLog}|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
     ip=`ifconfig eth0|grep inet|grep -v inet6 |awk '{ print $2 }'`
     sed -i -e "s?FileRoot = \"\"?FileRoot = \"/mnt/efs/${workdir}/${ip}/\"?g" /server/${workdir}/config.toml
@@ -122,7 +122,7 @@ function startChaind() {
     env RUST_LOG=${LOG_LEVEL} BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${workspace}/${bin} node \
         --chain ${workspace}/genesis_reth.json \
         --datadir ${workspace} \
-        --genesis-hash ${rialtoHash} \
+        # --genesis-hash ${rialtoHash} \
         --http \
         --http.addr 0.0.0.0 \
         --http.port ${HTTPPort} \
