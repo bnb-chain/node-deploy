@@ -476,7 +476,7 @@ function native_start() {
     rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
     ValIdx=$1
-    for ((i = 0; i < size; i++));do
+    for ((i = 0; i < size; i++)); do
         if [ ! -z $ValIdx ] && [ $i -ne $ValIdx ]; then
             continue
         fi
@@ -563,7 +563,7 @@ function remote_reset_config() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
     ips=(${validator_ips_comma//,/ })
-    for ((i=0;i<${#ips[@]};i++));do
+    for ((i=0;i<${#ips[@]};i++)); do
         dst_id=${ips2ids[${ips[i]}]}
         echo "reset config for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
@@ -594,8 +594,10 @@ function remote_reset_config() {
 function remote_start() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
-    for dst_id in ${ips2ids[@]}; do
-        echo "start node${i}, dst_id: ${dst_id}"
+    ips=(${validator_ips_comma//,/ })
+    for ((i=0;i<${#ips[@]};i++)); do
+        dst_id=${ips2ids[${ips[i]}]}
+        echo "start node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         # if [ $i -lt $RETH_NODE_COUNT ]; then
             # if [ ${EnableSentryNode} = true ]; then
@@ -644,8 +646,10 @@ function remote_upgrade() {
     fi
     cp ${workspace}/qa-env-resource/upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
     cp ${workspace}/qa-env-resource/reth-bsc-upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
-    for dst_id in ${ips2ids[@]}; do
-        echo "upgrade config for node${i}, dst_id: ${dst_id}"
+    ips=(${validator_ips_comma//,/ })
+    for ((i=0;i<${#ips[@]};i++)); do
+        dst_id=${ips2ids[${ips[i]}]}
+        echo "upgrade config for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
             if [ ${EnableSentryNode} = true ]; then
