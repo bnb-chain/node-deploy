@@ -106,6 +106,14 @@ function startChaind() {
         if [ -n "${remove_nodeid}" ]; then
             evn_conf+=(--evn.remove-nodeid ${remove_nodeid})
         fi
+        whitelist_nodeid=$(grep -E "EVNNodeIdsWhitelist" ${workspace}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${whitelist_nodeid}" ]; then
+            evn_conf+=(--evn.whitelist-nodeids ${whitelist_nodeid})
+        fi
+        proxyed_val=$(grep -E "ProxyedValidatorAddresses" ${workspace}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${proxyed_val}" ]; then
+            evn_conf+=(--evn.proxyed-validator ${proxyed_val})
+        fi
     fi
 
     echo "nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}, mining_conf: ${mining_conf[@]}"

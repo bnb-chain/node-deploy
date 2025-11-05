@@ -711,6 +711,9 @@ remote_reset_config)
 remote_upgrade)
     remote_upgrade
     ;;
+register_stakehub)
+    register_stakehub
+    ;;
 *)
     echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx]| remote_reset | remote_upgrade"
     ;;
