@@ -598,14 +598,14 @@ function remote_start() {
         echo "start node${i}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
-            if [ ${EnableSentryNode} = true ]; then
+            # if [ ${EnableSentryNode} = true ]; then
                 aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service reth-bsc-sentry stop"
-            fi
+            # fi
             aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service reth-bsc stop"
         else
-            if [ ${EnableSentryNode} = true ]; then
+            # if [ ${EnableSentryNode} = true ]; then
                 aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service sentry stop"
-            fi
+            # fi
             aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo service bsc stop"
         fi
     done
