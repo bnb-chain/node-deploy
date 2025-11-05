@@ -701,8 +701,11 @@ remote_reset)
     prepare_config
     initNetwork
     remote_start
+    # it may cost some time to start the nodes
+    sleep 100
     # to prevent stuck
     remote_upgrade
+    sleep 100
     register_stakehub
     ;;
 remote_reset_config)
@@ -714,6 +717,7 @@ remote_reset_config)
     ;;
 remote_upgrade)
     remote_upgrade
+    sleep 100
     ;;
 register_stakehub)
     register_stakehub
