@@ -58,8 +58,8 @@ HTTPVirtualHosts = ["localhost"]
 HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "miner"]
 WSPort = 8546
 WSModules = ["net", "web3", "eth"]
-EnableEVNFeatures = true
-EnableQuickBlockFetching = true
+EnableEVNFeatures = false
+EnableQuickBlockFetching = false
 
 [Node.P2P]
 MaxPeers = 30
