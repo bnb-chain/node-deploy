@@ -639,13 +639,15 @@ function remote_start() {
 }
 
 function remote_upgrade() {
-    cp ${workspace}/bin/geth /mnt/efs/${copyDir}/clusterNetwork/
+    \cp -f ${RETH_BSC_BINARY_PATH} ${workspace}/bin/reth-bsc
+    \cp -f ${workspace}/bin/geth /mnt/efs/${copyDir}/clusterNetwork/
+    \cp -f ${workspace}/bin/reth-bsc /mnt/efs/${copyDir}/clusterNetwork/
     if [ ${EnableSentryNode} = true ]; then
-        cp ${workspace}/qa-env-resource/upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
-        cp ${workspace}/qa-env-resource/reth-bsc-upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
+        \cp -f ${workspace}/qa-env-resource/upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
+        \cp -f ${workspace}/qa-env-resource/reth-bsc-upgrade-single-sentry.sh /mnt/efs/${copyDir}/clusterNetwork/
     fi
-    cp ${workspace}/qa-env-resource/upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
-    cp ${workspace}/qa-env-resource/reth-bsc-upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
+    \cp -f ${workspace}/qa-env-resource/upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
+    \cp -f ${workspace}/qa-env-resource/reth-bsc-upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
     ips=(${validator_ips_comma//,/ })
     for ((i=0;i<${#ips[@]};i++)); do
         dst_id=${ips2ids[${ips[i]}]}
