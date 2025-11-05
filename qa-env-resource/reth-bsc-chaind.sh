@@ -119,10 +119,10 @@ function startChaind() {
     echo "nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}, mining_conf: ${mining_conf[@]}"
     
     # Run reth-bsc node
+    # --genesis-hash ${rialtoHash} \
     env RUST_LOG=${LOG_LEVEL} BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${workspace}/${bin} node \
         --chain ${workspace}/genesis_reth.json \
         --datadir ${workspace} \
-        # --genesis-hash ${rialtoHash} \
         --http \
         --http.addr 0.0.0.0 \
         --http.port ${HTTPPort} \
