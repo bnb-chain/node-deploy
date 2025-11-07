@@ -92,6 +92,15 @@ function startChaind() {
         mining_conf+=(--mining.keystore-path ${keystore_path})
         mining_conf+=(--mining.keystore-password ${KEYPASS})
         mining_conf+=( "${bls_cli_args[@]}" )
+        gas_limit=$(grep -E "GasCeil" ${workspace}/config.toml | grep -oE '[0-9]+' | head -1)
+        gas_price=$(grep -E "GasPrice" ${workspace}/config.toml | grep -oE '[0-9]+' | head -1)
+        max_peers=$(grep -E "MaxPeers" ${workspace}/config.toml | grep -oE '[0-9]+' | head -1)
+        txpool_price_limit=$(grep -E "PriceLimit" ${workspace}/config.toml | grep -oE '[0-9]+' | head -1)
+        no_discovery=$(grep -E "NoDiscovery" ${workspace}/config.toml | grep -oE 'true' | head -1)
+        if [ -n "${gas_limit}" ]; then
+            mining_conf+=(--builder.gaslimit ${gas_limit})
+        fi
+        echo "gas_limit: ${gas_limit}, gas_price: ${gas_price}, max_peers: ${max_peers}, txpool_price_limit: ${txpool_price_limit}, no_discovery: ${no_discovery}"
     fi
 
     evn_conf=()
