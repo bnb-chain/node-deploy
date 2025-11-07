@@ -295,7 +295,7 @@ function start_reth_bsc() {
     
     # Extract discovery port from the current node's config.toml ListenAddr
     discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
-    auth_port=8551
+    auth_port=$((8551+nodeIndex))
     
     # Detect keystore path dynamically
     keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
@@ -345,6 +345,7 @@ function start_reth_bsc() {
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
+        --disable-discovery \
         --http \
         --http.addr 0.0.0.0 \
         --http.port ${HTTPPort} \
@@ -392,6 +393,7 @@ function start_reth_bsc() {
             --chain ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json \
             --datadir ${workspace}/.local/sentry${nodeIndex} \
             --genesis-hash ${rialtoHash} \
+            --disable-discovery \
             --http \
             --http.addr 0.0.0.0 \
             --http.port $((HTTPPort+1)) \
@@ -417,6 +419,7 @@ function native_start() {
 
     ValIdx=$1
     for ((i = 0; i < size; i++));do
+        sleep 2
         if [ ! -z $ValIdx ] && [ $i -ne $ValIdx ]; then
             continue
         fi
