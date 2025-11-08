@@ -341,7 +341,7 @@ function start_reth_bsc() {
     echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
     
     # Run reth-bsc node
-    nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
@@ -389,7 +389,7 @@ function start_reth_bsc() {
         fi
 
         echo "sentry${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
-        nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+        nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
             --chain ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json \
             --datadir ${workspace}/.local/sentry${nodeIndex} \
             --genesis-hash ${rialtoHash} \
