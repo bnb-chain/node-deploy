@@ -147,6 +147,8 @@ function startChaind() {
         ${evn_conf[@]} \
         ${mining_conf[@]} \
         --log.stdout.format log-fmt \
+        --engine.persistence-threshold 10 \
+        --engine.memory-block-buffer-target 5 \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 

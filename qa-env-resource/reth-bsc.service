@@ -13,6 +13,7 @@ PrivateTmp=true
 LimitNOFILE=10000
 StartLimitInterval=0
 TimeoutStopSec=120
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
