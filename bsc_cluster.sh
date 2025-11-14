@@ -268,7 +268,7 @@ function start_reth_bsc() {
     cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${nodeIndex}/genesis.json
     
     # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except Maxwell at LastHardforkTime
-    jq --arg passedTime "$PassedForkTime" --arg maxwellTime "$LastHardforkTime" '
+    jq --arg passedTime "$PassedForkTime" --arg lastTime "$LastHardforkTime" '
         .config.shanghaiTime = ($passedTime | tonumber) |
         .config.keplerTime = ($passedTime | tonumber) |
         .config.feynmanTime = ($passedTime | tonumber) |
@@ -277,11 +277,12 @@ function start_reth_bsc() {
         .config.haberTime = ($passedTime | tonumber) |
         .config.haberFixTime = ($passedTime | tonumber) |
         .config.lorentzTime = ($passedTime | tonumber) |
-        .config.maxwellTime = ($maxwellTime | tonumber) |
         .config.bohrTime = ($passedTime | tonumber) |
         .config.tychoTime = ($passedTime | tonumber) |
         .config.pragueTime = ($passedTime | tonumber) |
-        .config.pascalTime = ($passedTime | tonumber)
+        .config.pascalTime = ($passedTime | tonumber) |
+        .config.maxwellTime = ($passedTime | tonumber) |
+        .config.fermiTime = ($lastTime | tonumber)
     ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
 
     if [ ${EnableSentryNode} = true ]; then
@@ -341,7 +342,7 @@ function start_reth_bsc() {
     echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
     
     # Run reth-bsc node
-    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+    nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
@@ -453,7 +454,7 @@ function native_start() {
                 --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
                 --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
                 --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                 >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
@@ -468,7 +469,7 @@ function native_start() {
                     --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
                     --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
                     --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                    --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+                    --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
                     --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                     --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                     >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
@@ -486,7 +487,7 @@ function native_start() {
             --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
