@@ -21,7 +21,7 @@ MaxWaitProposalInSecs = 3
 [Eth.Miner.Mev]
 Enabled = true
 GreedyMergeTx = true
-BuilderFeeCeil= "0"
+BuilderFeeCeil = "0"
 ValidatorCommission = 1000
 
 [[Eth.Miner.Mev.Builders]]
@@ -54,7 +54,7 @@ EnableQuickBlockFetching = false
 
 [Node.P2P]
 MaxPeers = 50
-NoDiscovery = false
+NoDiscovery = true
 StaticNodes = []
 TrustedNodes = []
 EnableMsgEvents = false
