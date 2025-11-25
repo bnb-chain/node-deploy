@@ -152,6 +152,7 @@ function startChaind() {
         --engine.memory-block-buffer-target 5 \
 	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
 	--metrics 0.0.0.0:6060 \
+	--miner.gaslimit 140000000 \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 

@@ -425,6 +425,7 @@ function start_reth_bsc() {
         --log.stdout.format log-fmt \
 	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
 	 --metrics 0.0.0.0:6060 \
+	 --miner.gaslimit 140000000 \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
     
     if [ ${EnableSentryNode} = true ]; then
