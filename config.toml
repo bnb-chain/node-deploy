@@ -50,7 +50,7 @@ HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "debug"]
 WSHost = "0.0.0.0"
 WSPort = 8545
 EnableEVNFeatures = false
-EnableQuickBlockFetching = false
+EnableQuickBlockFetching = true
 
 [Node.P2P]
 MaxPeers = 50
