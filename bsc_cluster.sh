@@ -422,6 +422,8 @@ function start_reth_bsc() {
         --mining.keystore-path ${keystore_path} \
         --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
         --log.stdout.format log-fmt \
+	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
+	 --metrics 0.0.0.0:6060 \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
     
     if [ ${EnableSentryNode} = true ]; then
@@ -466,6 +468,7 @@ function start_reth_bsc() {
             ${peer_conf[@]} \
             ${evn_conf[@]} \
             --log.stdout.format log-fmt \
+	     --metrics 0.0.0.0:6060 \
             >> ${workspace}/.local/sentry${nodeIndex}/reth.log 2>&1 &
     fi
 }
