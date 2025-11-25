@@ -33,7 +33,7 @@ function startChaind() {
 
     # read flags from config.toml
     # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except Maxwell at LastHardforkTime
-    jq --arg passedTime "$PassedForkTime" --arg maxwellTime "$LastHardforkTime" '
+    jq --arg passedTime "$PassedForkTime" --arg lastTime "$LastHardforkTime" '
         .config.shanghaiTime = ($passedTime | tonumber) |
         .config.keplerTime = ($passedTime | tonumber) |
         .config.feynmanTime = ($passedTime | tonumber) |
@@ -42,11 +42,12 @@ function startChaind() {
         .config.haberTime = ($passedTime | tonumber) |
         .config.haberFixTime = ($passedTime | tonumber) |
         .config.lorentzTime = ($passedTime | tonumber) |
-        .config.maxwellTime = ($maxwellTime | tonumber) |
         .config.bohrTime = ($passedTime | tonumber) |
         .config.tychoTime = ($passedTime | tonumber) |
         .config.pragueTime = ($passedTime | tonumber) |
-        .config.pascalTime = ($passedTime | tonumber)
+        .config.pascalTime = ($passedTime | tonumber) |
+        .config.maxwellTime = ($passedTime | tonumber) |
+        .config.fermiTime = ($lastTime | tonumber)
     ' ${workspace}/genesis.json > ${workspace}/genesis_reth.json
     
     # Get the first bootnode enode from BootstrapNodes configuration
