@@ -189,77 +189,84 @@ function initNetwork() {
     fi
 }
 
+function start_node() {
+    local type=$1       # node | sentry | full
+    local idx=$2        # index (validator/sentry)，full default 0
+    local datadir=$3
+    local geth_bin=$4
+    local cons_addr=$5
+    local http_port=$6
+    local ws_port=$7
+    local metrics_port=$8
+    local pprof_port=$9
+
+    # update `config` in genesis.json
+    # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
+    nohup ${geth_bin} --config ${datadir}/config.toml \
+        --datadir ${datadir} \
+        --nodekey ${datadir}/geth/nodekey \
+        --rpc.allow-unprotected-txs --allow-insecure-unlock \
+        --ws --ws.addr 0.0.0.0 --ws.port ${ws_port} \
+        --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
+        --metrics --metrics.addr localhost --metrics.port ${metrics_port} --metrics.expensive \
+        --pprof --pprof.addr localhost --pprof.port ${pprof_port} \
+        --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
+        --rialtohash ${rialtoHash} \
+        --override.passedforktime ${PassedForkTime} \
+        --override.lorentz ${PassedForkTime} \
+        --override.maxwell ${PassedForkTime} \
+        --override.fermi ${LastHardforkTime} \
+        --override.immutabilitythreshold ${FullImmutabilityThreshold} \
+        --override.breatheblockinterval ${BreatheBlockInterval} \
+        --override.minforblobrequest ${MinBlocksForBlobRequests} \
+        --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
+        $( [ "${type}" = "node" ] && echo "--mine --vote --unlock ${cons_addr} --miner.etherbase ${cons_addr} --password ${datadir}/password.txt --blspassword ${datadir}/password.txt" ) \
+        >> ${datadir}/bsc-node.log 2>&1 &
+}
+
 function native_start() {
     PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
     rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
-    ValIdx=$1
-    for ((i = 0; i < size; i++));do
-        if [ ! -z $ValIdx ] && [ $i -ne $ValIdx ]; then
+    for ((i=0; i<size; i++)); do
+        datadir="${workspace}/.local/node${i}"
+
+        # optional: ValIdx filtering
+        if [ ! -z "$1" ] && [ $i -ne $1 ]; then
             continue
         fi
 
-        for j in ${workspace}/.local/node${i}/keystore/*;do
-            cons_addr="0x$(cat ${j} | jq -r .address)"
-        done
+        # get validator address
+        cons_addr="0x$(jq -r .address ${datadir}/keystore/*)"
 
-        HTTPPort=$((8545 + i*2))
-        WSPort=${HTTPPort}
-        MetricsPort=$((6060 + i*2))
-        PProfPort=$((7060 + i*2))
- 
-        # geth may be replaced
-        cp ${workspace}/bin/geth ${workspace}/.local/node${i}/geth${i}
-        # update `config` in genesis.json
-        # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
-        # run BSC node
-        nohup  ${workspace}/.local/node${i}/geth${i} --config ${workspace}/.local/node${i}/config.toml \
-            --mine --vote --password ${workspace}/.local/node${i}/password.txt --unlock ${cons_addr} --miner.etherbase ${cons_addr} --blspassword ${workspace}/.local/node${i}/password.txt \
-            --datadir ${workspace}/.local/node${i} \
-            --nodekey ${workspace}/.local/node${i}/geth/nodekey \
-            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws --ws.addr 0.0.0.0 --ws.port ${WSPort} --http --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
-            --metrics --metrics.addr localhost --metrics.port ${MetricsPort} --metrics.expensive \
-            --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
-            --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
-            --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
-            --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
-        
-        if [ ${EnableSentryNode} = true ]; then
-            cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
-            nohup  ${workspace}/.local/sentry${i}/geth${i} --config ${workspace}/.local/sentry${i}/config.toml \
-                --datadir ${workspace}/.local/sentry${i} \
-                --nodekey ${workspace}/.local/sentry${i}/geth/nodekey \
-                --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-                --ws --ws.addr 0.0.0.0 --ws.port $((WSPort+1)) --http --http.addr 0.0.0.0 --http.port $((HTTPPort+1)) --http.corsdomain "*" \
-                --metrics --metrics.addr localhost --metrics.port $((MetricsPort+1)) --metrics.expensive \
-                --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
-                --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-                --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
-                --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
-                --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-                >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
-        fi
+        cp ${workspace}/bin/geth ${datadir}/geth${i}
+
+        base=$((8545 + i*2))
+        start_node "node" $i $datadir "${datadir}/geth${i}" "${cons_addr}" \
+            $base $base $((6060+i*2)) $((7060+i*2))
     done
 
-    if [ ${EnableFullNode} = true ]; then
-        cp ${workspace}/bin/geth ${workspace}/.local/fullnode0/geth0
-        nohup  ${workspace}/.local/fullnode0/geth0 --config ${workspace}/.local/fullnode0/config.toml \
-            --datadir ${workspace}/.local/fullnode0 \
-            --nodekey ${workspace}/.local/fullnode0/geth/nodekey \
-            --rpc.allow-unprotected-txs --allow-insecure-unlock  \
-            --ws --ws.addr 0.0.0.0 --ws.port $((8645)) --http --http.addr 0.0.0.0 --http.port $((8645)) --http.corsdomain "*" \
-            --metrics --metrics.addr localhost --metrics.port $((6160)) --metrics.expensive \
-            --pprof --pprof.addr localhost --pprof.port $((7160)) \
-            --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-            --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
-            --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
-            --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
+    if [ ${EnableSentryNode} = true ]; then
+        sleep 10
+        for ((i=0; i<size; i++)); do
+            datadir="${workspace}/.local/sentry${i}"
+            cp ${workspace}/bin/geth ${datadir}/geth${i}
+
+            base=$((8545 + i*2))
+            start_node "sentry" $i $datadir "${datadir}/geth${i}" "" \
+                $((base+1)) $((base+1)) $((6060+i*2+1)) $((7060+i*2+1))
+        done
     fi
+
+    if [ ${EnableFullNode} = true ]; then
+        datadir="${workspace}/.local/fullnode0"
+        cp ${workspace}/bin/geth ${datadir}/geth0
+
+        start_node "full" 0 $datadir "${datadir}/geth0" "" \
+            8645 8645 6160 7160
+    fi
+
     sleep ${sleepAfterStart}
 }
 
