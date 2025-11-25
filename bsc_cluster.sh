@@ -356,8 +356,7 @@ function start_reth_bsc() {
     
     # Extract discovery port from the current node's config.toml ListenAddr
     discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
-    auth_port=$((8551+nodeIndex))
-    
+    auth_port=8551
     # Detect keystore path dynamically
     keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
     nodekey_path=$(find ${workspace}/.local/node${nodeIndex}/geth/nodekey -type f | head -1)

@@ -150,6 +150,8 @@ function startChaind() {
         --log.stdout.format log-fmt \
         --engine.persistence-threshold 10 \
         --engine.memory-block-buffer-target 5 \
+	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
+	--metrics 0.0.0.0:6060 \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 
