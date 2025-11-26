@@ -121,6 +121,7 @@ function prepare_config() {
       --governor-protector "${INIT_HOLDER}" \
       --init-minimal-delay "1 minutes" \
       --token-recover-portal-protector "${INIT_HOLDER}"
+    cp genesis-dev.json genesis.json
 }
 
 function initNetwork() {
