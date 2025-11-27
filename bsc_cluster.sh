@@ -50,7 +50,7 @@ function reset_genesis() {
     fi
     cd ${workspace}/genesis
     cp genesis-template.json genesis-template.json.bk
-    cp scripts/init_holders.template scripts/init_holders.template.bk
+    cp ${workspace}/init_holders.template scripts/init_holders.template.bk
     git stash
     cd ${workspace} && git submodule update --remote --recursive genesis && cd ${workspace}/genesis
     git reset --hard ${GENESIS_COMMIT}
@@ -100,7 +100,7 @@ function prepare_config() {
     cd ${workspace}/genesis/
     git checkout HEAD contracts
     sed -i -e  's/alreadyInit = true;/turnLength = 16;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
-    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 2000) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
+    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 600) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
@@ -211,16 +211,8 @@ function start_node() {
         --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
         --metrics --metrics.addr localhost --metrics.port ${metrics_port} --metrics.expensive \
         --pprof --pprof.addr localhost --pprof.port ${pprof_port} \
-        --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-        --rialtohash ${rialtoHash} \
-        --override.passedforktime ${PassedForkTime} \
-        --override.lorentz ${PassedForkTime} \
-        --override.maxwell ${PassedForkTime} \
-        --override.fermi ${LastHardforkTime} \
-        --override.immutabilitythreshold ${FullImmutabilityThreshold} \
+        --gcmode ${gcmode} --syncmode full --history.transactions 0 --monitor.maliciousvote \
         --override.breatheblockinterval ${BreatheBlockInterval} \
-        --override.minforblobrequest ${MinBlocksForBlobRequests} \
-        --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
         $( [ "${type}" = "node" ] && echo "--mine --vote --unlock ${cons_addr} --miner.etherbase ${cons_addr} --password ${datadir}/password.txt --blspassword ${datadir}/password.txt" ) \
         >> ${datadir}/bsc-node.log 2>&1 &
 }
@@ -275,7 +267,7 @@ function register_stakehub(){
     # wait feynman enable
     sleep 45
     for ((i = 0; i < size; i++));do
-        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator$((i+3)) --vote-key-dir ${workspace}/keys/bls$((i+3)) \
             --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
     done
 }
@@ -302,6 +294,20 @@ start)
 restart)
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
+    ;;
+switch)
+    exit_previous 0
+    rm -rf .local/node0/bls && rm -rf .local/node0/keystore
+    cp -r  keys/bls3/bls .local/node0/ && cp -r keys/validator3/keystore .local/node0/
+    native_start 0
+    exit_previous 1
+    rm -rf .local/node1/bls && rm -rf .local/node1/keystore
+    cp -r  keys/bls4/bls .local/node1/ && cp -r keys/validator4/keystore .local/node1/
+    native_start 1
+    exit_previous 2
+    rm -rf .local/node2/bls && rm -rf .local/node2/keystore
+    cp -r  keys/bls5/bls .local/node2/ && cp -r keys/validator5/keystore .local/node2/
+    native_start 2
     ;;
 *)
     echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx]"

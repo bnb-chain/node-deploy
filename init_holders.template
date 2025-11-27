@@ -1,0 +1,21 @@
+const web3 = require('web3');
+const init_holders = [
+  {
+     address: '0x3ad55d1d552cc55dee90c0faf0335383b2e6c5ce',
+     balance: BigInt('500000000000000000000000000').toString(16) // 500M e18
+  },
+  {
+     address: '0xfe02c8ff2374583c47b1d62fdf3e1b72c20ebe29',
+     balance: BigInt('500000000000000000000000000').toString(16) // 500M e18
+  },
+  {
+     address: '0xf7698afa5461438ff438c2322d6d29a5f7abdffd',
+     balance: BigInt('500000000000000000000000000').toString(16) // 500M e18
+  },
+  {% for initHolder in initHolders %}{
+     address: '{{initHolder }}',
+     balance: BigInt('0').toString(16) // 500M e18
+  },{% endfor %}
+];
+
+exports = module.exports = init_holders;
