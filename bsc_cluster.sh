@@ -17,7 +17,7 @@ dbEngine="leveldb"
 gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
-copyDir="bsc-qa"
+copyDir="bsc-qa2"
 
 # Validation function for reth-bsc configuration
 function validate_reth_config() {

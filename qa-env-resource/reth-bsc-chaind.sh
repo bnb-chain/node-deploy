@@ -11,7 +11,7 @@ MinBlocksForBlobRequests=524288
 DefaultExtraReserveForBlobRequests=28800
 BreatheBlockInterval=600
 LAST_FORK_MORE_DELAY=600
-LOG_LEVEL="debug"
+LOG_LEVEL="info"
 KEYPASS="123456"
 ENABLE_MINING=true
 
@@ -130,7 +130,7 @@ function startChaind() {
     
     # Run reth-bsc node
     # --genesis-hash ${rialtoHash} \
-    env RUST_LOG=${LOG_LEVEL} BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${workspace}/${bin} node \
+    env RUST_LOG=info BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} BSC_SUBMIT_BUILT_PAYLOAD=true ${workspace}/${bin} node \
         --chain ${workspace}/genesis_reth.json \
         --datadir ${workspace} \
         --http \
@@ -149,10 +149,15 @@ function startChaind() {
         ${mining_conf[@]} \
         --log.stdout.format log-fmt \
         --engine.persistence-threshold 10 \
-        --engine.memory-block-buffer-target 5 \
+        --engine.memory-block-buffer-target 128 \
 	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
 	--metrics 0.0.0.0:6060 \
-	--miner.gaslimit 140000000 \
+	--mining.gas-limit 140000000 \
+	--engine.parallel-sparse-trie \
+	--rpc.max-connections 2000 \
+	--engine.cross-block-cache-size 16384 \
+	--engine.max-proof-task-concurrency 128 \
+	--engine.reserved-cpu-cores 2 \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 
