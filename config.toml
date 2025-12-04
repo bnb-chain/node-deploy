@@ -13,7 +13,7 @@ EnablePreimageRecording = false
 EVNNodeIDsToAdd = []
 
 [Eth.Miner]
-GasCeil = 140000000
+GasCeil = 25000000
 GasPrice = 1000000000
 Recommit = 10000000000
 MaxWaitProposalInSecs = 3

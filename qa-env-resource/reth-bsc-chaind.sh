@@ -100,6 +100,7 @@ function startChaind() {
         no_discovery=$(grep -E "NoDiscovery" ${workspace}/config.toml | grep -oE 'true' | head -1)
         if [ -n "${gas_limit}" ]; then
             mining_conf+=(--builder.gaslimit ${gas_limit})
+            mining_conf+=(--mining.gas-limit ${gas_limit})
         fi
         echo "gas_limit: ${gas_limit}, gas_price: ${gas_price}, max_peers: ${max_peers}, txpool_price_limit: ${txpool_price_limit}, no_discovery: ${no_discovery}"
     fi
@@ -150,14 +151,13 @@ function startChaind() {
         --log.stdout.format log-fmt \
         --engine.persistence-threshold 10 \
         --engine.memory-block-buffer-target 128 \
-	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
-	--metrics 0.0.0.0:6060 \
-	--mining.gas-limit 140000000 \
-	--engine.parallel-sparse-trie \
-	--rpc.max-connections 2000 \
-	--engine.cross-block-cache-size 16384 \
-	--engine.max-proof-task-concurrency 128 \
-	--engine.reserved-cpu-cores 2 \
+        --log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
+        --metrics 0.0.0.0:6060 \
+        --engine.parallel-sparse-trie \
+        --rpc.max-connections 2000 \
+        --engine.cross-block-cache-size 16384 \
+        --engine.max-proof-task-concurrency 128 \
+        --engine.reserved-cpu-cores 2 \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 
