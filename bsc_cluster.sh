@@ -361,6 +361,7 @@ function start_reth_bsc() {
         ${peer_conf[@]} \
         ${evn_conf[@]} \
         --mining.enabled \
+        --mining.min-gas-tip 1000000000 \
         --mining.keystore-path ${keystore_path} \
         --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
         --log.stdout.format log-fmt --engine.persistence-threshold 10 --engine.memory-block-buffer-target 128 \
