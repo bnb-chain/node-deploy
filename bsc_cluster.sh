@@ -160,25 +160,44 @@ function prepare_config() {
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
             sed -i -e "s/KEYPASS=\"123456\"/KEYPASS=\"${KEYPASS}\"/g" reth-bsc-chaind.sh
+            # TODO: remove reth-bsc-sentry, using geth sentry instead
+            # if [ ${EnableSentryNode} = true ]; then
+            #     targetDir=${workspace}/.local/sentry${i}
+            #     mkdir -p ${targetDir} && cd ${targetDir}
+            #     cp ${workspace}/.local/hardforkTime.txt ./
+            #     cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
+            #     sed -i -e "s/KEYPASS=\"123456\"/KEYPASS=\"${KEYPASS}\"/g" reth-bsc-chaind.sh
+            #     sed -i -e 's/ENABLE_MINING=true/ENABLE_MINING=false/g' reth-bsc-chaind.sh
+            #     sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-chaind.sh
+            #     sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-chaind.sh
+            #     sed -i -e 's/portInc=0/portInc=2/g' reth-bsc-chaind.sh
+            #     sed -i -e 's/auth_port=8551/auth_port=8552/g' reth-bsc-chaind.sh
+            #     rm -f reth-bsc-chaind.sh.bak
+            #     sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-init.sh
+            #     sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-init.sh
+            #     rm -f reth-bsc-init.sh.bak
+            #     mv reth-bsc.service reth-bsc-sentry.service
+            #     sed -i -e 's/validator/sentry/g' reth-bsc-sentry.service
+            #     sed -i -e 's/Description=reth-bsc/Description=reth-bsc-sentry/g' reth-bsc-sentry.service
+            #     rm -f reth-bsc-sentry.service.bak
+            # fi
             if [ ${EnableSentryNode} = true ]; then
                 targetDir=${workspace}/.local/sentry${i}
                 mkdir -p ${targetDir} && cd ${targetDir}
                 cp ${workspace}/.local/hardforkTime.txt ./
                 cp ${workspace}/qa-env-resource/* ./ && rm -f *upgrade-single*
-                sed -i -e "s/KEYPASS=\"123456\"/KEYPASS=\"${KEYPASS}\"/g" reth-bsc-chaind.sh
-                sed -i -e 's/ENABLE_MINING=true/ENABLE_MINING=false/g' reth-bsc-chaind.sh
-                sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-chaind.sh
-                sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-chaind.sh
-                sed -i -e 's/portInc=0/portInc=2/g' reth-bsc-chaind.sh
-                sed -i -e 's/auth_port=8551/auth_port=8552/g' reth-bsc-chaind.sh
-                rm -f reth-bsc-chaind.sh.bak
-                sed -i -e 's/workdir="validator"/workdir="sentry"/g' reth-bsc-init.sh
-                sed -i -e 's/bin="reth-bsc"/bin="reth-bsc-sentry"/g' reth-bsc-init.sh
-                rm -f reth-bsc-init.sh.bak
-                mv reth-bsc.service reth-bsc-sentry.service
-                sed -i -e 's/validator/sentry/g' reth-bsc-sentry.service
-                sed -i -e 's/Description=reth-bsc/Description=reth-bsc-sentry/g' reth-bsc-sentry.service
-                rm -f reth-bsc-sentry.service.bak
+                sed -i -e '/--mine/d' chaind.sh
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' chaind.sh
+                sed -i -e 's/bin="bsc"/bin="sentry"/g' chaind.sh
+                sed -i -e "s/portInc=0/portInc=2/g" chaind.sh
+                rm -f chaind.sh.bak
+                sed -i -e 's/workdir="validator"/workdir="sentry"/g' init.sh
+                sed -i -e 's/bin="bsc"/bin="sentry"/g' init.sh
+                rm -f init.sh.bak
+                mv bsc.service sentry.service
+                sed -i -e 's/validator/sentry/g' sentry.service
+                sed -i -e 's/bsc/sentry/g' sentry.service
+                rm -f sentry.service.bak
             fi
         else
             sed -i -e "s/{{validatorAddr}}/${cons_addr}/g"  chaind.sh && rm -f chaind.sh.bak
@@ -628,7 +647,9 @@ function remote_start() {
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
             if [ ${EnableSentryNode} = true ]; then
-                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/reth-bsc-init.sh"
+                # TODO: remove reth-bsc-sentry, using geth sentry instead
+                # aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/reth-bsc-init.sh"
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/sentry${i}/init.sh"
             fi
             aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo bash -x /mnt/efs/${copyDir}/clusterNetwork/node${i}/reth-bsc-init.sh"
         else
@@ -662,7 +683,10 @@ function remote_upgrade() {
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
         if [ $i -lt $RETH_NODE_COUNT ]; then
             if [ ${EnableSentryNode} = true ]; then
-                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc-upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/reth-bsc-upgrade-single-sentry.sh"
+                # TODO: remove reth-bsc-sentry, using geth sentry instead
+                # aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc-upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/reth-bsc-upgrade-single-sentry.sh"
+                aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript" \
+                --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/geth /tmp/geth && sudo cp /mnt/efs/${copyDir}/clusterNetwork/upgrade-single-sentry.sh /tmp/ && sudo bash -x /tmp/upgrade-single-sentry.sh"
             fi
             aws ssm send-command --instance-ids "${dst_id}" --document-name "AWS-RunShellScript"   --parameters commands="sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc /tmp/reth-bsc && sudo cp /mnt/efs/${copyDir}/clusterNetwork/reth-bsc-upgrade-single-validator.sh /tmp/ && sudo bash -x /tmp/reth-bsc-upgrade-single-validator.sh"
         else
