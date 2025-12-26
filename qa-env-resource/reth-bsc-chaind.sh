@@ -149,15 +149,13 @@ function startChaind() {
         ${evn_conf[@]} \
         ${mining_conf[@]} \
         --log.stdout.format log-fmt \
-        --engine.persistence-threshold 10 \
-        --engine.memory-block-buffer-target 128 \
-        --log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
         --metrics 0.0.0.0:6060 \
         --engine.parallel-sparse-trie \
         --rpc.max-connections 2000 \
         --engine.cross-block-cache-size 16384 \
-        --engine.max-proof-task-concurrency 128 \
-        --engine.reserved-cpu-cores 2 \
+        --engine.max-proof-task-concurrency 800 \
+	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
+	--db.sync-mode no-sync
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 
