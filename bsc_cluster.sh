@@ -209,7 +209,7 @@ function start_node() {
         --rpc.allow-unprotected-txs --allow-insecure-unlock \
         --ws --ws.addr 0.0.0.0 --ws.port ${ws_port} \
         --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
-        --metrics --metrics.addr localhost --metrics.port ${metrics_port} --metrics.expensive \
+        --metrics --metrics.addr localhost --metrics.port ${metrics_port} \
         --pprof --pprof.addr localhost --pprof.port ${pprof_port} \
         --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
         --rialtohash ${rialtoHash} \
