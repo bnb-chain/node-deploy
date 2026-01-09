@@ -13,7 +13,7 @@ EnablePreimageRecording = false
 EVNNodeIDsToAdd = []
 
 [Eth.Miner]
-GasCeil = 35000000
+GasCeil = 140000000
 GasPrice = 1000000000
 Recommit = 10000000000
 DelayLeftOver = 25000000
@@ -59,7 +59,7 @@ HTTPModules = ["eth", "mev", "net", "web3", "txpool", "parlia", "miner"]
 WSPort = 8546
 WSModules = ["net", "web3", "eth"]
 EnableEVNFeatures = false
-EnableQuickBlockFetching = false
+EnableQuickBlockFetching = true
 
 [Node.P2P]
 MaxPeers = 30

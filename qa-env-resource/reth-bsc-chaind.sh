@@ -99,7 +99,7 @@ function startChaind() {
         txpool_price_limit=$(grep -E "PriceLimit" ${workspace}/config.toml | grep -oE '[0-9]+' | head -1)
         no_discovery=$(grep -E "NoDiscovery" ${workspace}/config.toml | grep -oE 'true' | head -1)
         if [ -n "${gas_limit}" ]; then
-            mining_conf+=(--builder.gaslimit ${gas_limit})
+	    mining_conf+=(--mining.gas-limit ${gas_limit})
         fi
         echo "gas_limit: ${gas_limit}, gas_price: ${gas_price}, max_peers: ${max_peers}, txpool_price_limit: ${txpool_price_limit}, no_discovery: ${no_discovery}"
     fi
@@ -130,14 +130,16 @@ function startChaind() {
     
     # Run reth-bsc node
     # --genesis-hash ${rialtoHash} \
-    env RUST_LOG=${LOG_LEVEL} BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${workspace}/${bin} node \
+    env RUST_LOG=${LOG_LEVEL} BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} BSC_SUBMIT_BUILT_PAYLOAD=true BSC_GREEDY_MERGE=true ${workspace}/${bin} node \
         --chain ${workspace}/genesis_reth.json \
         --datadir ${workspace} \
         --http \
+	--http.api txpool,net,web3,eth \
         --http.addr 0.0.0.0 \
         --http.port ${HTTPPort} \
         --p2p-secret-key ${nodekey_path} \
         --ws \
+	--ws.api txpool,net,web3,eth \
         --ws.addr 0.0.0.0 \
         --ws.port $((${WSPort})) \
         --discovery.addr 0.0.0.0 \
@@ -149,10 +151,10 @@ function startChaind() {
         ${mining_conf[@]} \
         --log.stdout.format log-fmt \
         --engine.persistence-threshold 10 \
-        --engine.memory-block-buffer-target 5 \
+        --engine.memory-block-buffer-target 128 \
 	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
 	--metrics 0.0.0.0:6060 \
-	--miner.gaslimit 140000000 \
+	--statedb.triedb \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 

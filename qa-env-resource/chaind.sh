@@ -32,7 +32,7 @@ function startChaind() {
         --mine --vote --unlock {{validatorAddr}} --miner.etherbase {{validatorAddr}} --password ${workspace}/password.txt --blspassword ${workspace}/password.txt \
         --datadir ${workspace} \
         --rpc.allow-unprotected-txs --allow-insecure-unlock \
-        --ws --ws.addr ${ip} --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" \
+        --ws --ws.addr ${ip} --ws.port ${WSPort} --http.addr 0.0.0.0 --http.port ${HTTPPort} --http.corsdomain "*" --http.api debug,trace,eth,txpool,net,web3,miner,admin,mev --ws.api debug,trace,eth,txpool,net,web3,miner,admin,mev \
         --metrics --metrics.addr 0.0.0.0 --metrics.port ${MetricsPort} \
         --pprof --pprof.port ${PProfPort} \
         --syncmode full --monitor.maliciousvote \
