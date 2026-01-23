@@ -154,7 +154,6 @@ function startChaind() {
         --engine.memory-block-buffer-target 128 \
 	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
 	--metrics 0.0.0.0:6060 \
-	--statedb.triedb \
         >> /mnt/efs/${workdir}/${ip}/reth.log 2>&1
 }
 
