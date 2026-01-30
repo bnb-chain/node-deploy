@@ -11,7 +11,11 @@ workspace=${basedir}
 source ${workspace}/.env
 source ${workspace}/qa-env-resource/machines_meta.sh # including machine ips and ids, don't upload!!!
 validator_ips=(${validator_ips_comma//,/ })
-size=${#validator_ips[@]}
+
+# Fixed 3 reth-bsc nodes configuration
+size=3
+RETH_NODE_COUNT=3  # Force all 3 nodes to be reth-bsc nodes
+
 stateScheme="hash"
 dbEngine="leveldb"
 gcmode="full"
@@ -19,53 +23,30 @@ sleepBeforeStart=15
 sleepAfterStart=10
 copyDir="bsc-qa2"
 
-# Validation function for reth-bsc configuration
+# Validation function for reth-bsc configuration (fixed 3 reth-bsc nodes)
 function validate_reth_config() {
-    # Check if RETH_NODE_COUNT is set and valid
-    if [ -z "$RETH_NODE_COUNT" ]; then
-        RETH_NODE_COUNT=0
-        echo "RETH_NODE_COUNT not set, defaulting to 0 (all geth nodes)"
-        return 0
-    fi
+    echo "✓ Fixed configuration: 3 reth-bsc nodes (node0, node1, node2)"
     
-    # Check if RETH_NODE_COUNT is not greater than total cluster size
-    if [ $RETH_NODE_COUNT -gt $size ]; then
-        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be greater than BSC_CLUSTER_SIZE ($size)"
-        echo "Please adjust RETH_NODE_COUNT in .env file to be <= $size"
+    # Validate reth-bsc binary
+    if [ -z "$RETH_BSC_BINARY_PATH" ]; then
+        echo "ERROR: RETH_BSC_BINARY_PATH is not set in .env file"
+        echo "Please set RETH_BSC_BINARY_PATH to the path of your reth-bsc binary"
         exit 1
     fi
     
-    # Check if RETH_NODE_COUNT is negative
-    if [ $RETH_NODE_COUNT -lt 0 ]; then
-        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be negative"
-        echo "Please set RETH_NODE_COUNT to a value between 0 and $size in .env file"
+    if [ ! -f "$RETH_BSC_BINARY_PATH" ]; then
+        echo "ERROR: reth-bsc binary not found at: $RETH_BSC_BINARY_PATH"
+        echo "Please check the RETH_BSC_BINARY_PATH in .env file and ensure the binary exists"
         exit 1
     fi
     
-    # If RETH_NODE_COUNT > 0, check if reth-bsc binary exists and is executable
-    if [ $RETH_NODE_COUNT -gt 0 ]; then
-        if [ -z "$RETH_BSC_BINARY_PATH" ]; then
-            echo "ERROR: RETH_BSC_BINARY_PATH is not set in .env file"
-            echo "Please set RETH_BSC_BINARY_PATH to the path of your reth-bsc binary"
-            exit 1
-        fi
-        
-        if [ ! -f "$RETH_BSC_BINARY_PATH" ]; then
-            echo "ERROR: reth-bsc binary not found at: $RETH_BSC_BINARY_PATH"
-            echo "Please check the RETH_BSC_BINARY_PATH in .env file and ensure the binary exists"
-            exit 1
-        fi
-        
-        if [ ! -x "$RETH_BSC_BINARY_PATH" ]; then
-            echo "ERROR: reth-bsc binary is not executable: $RETH_BSC_BINARY_PATH"
-            echo "Please make the binary executable with: chmod +x $RETH_BSC_BINARY_PATH"
-            exit 1
-        fi
-        
-        echo "✓ Validated: Will run $RETH_NODE_COUNT reth-bsc nodes (node0-node$((RETH_NODE_COUNT-1))) and $((size-RETH_NODE_COUNT)) geth nodes"
-    else
-        echo "✓ Validated: Will run all $size nodes with geth (no reth-bsc nodes)"
+    if [ ! -x "$RETH_BSC_BINARY_PATH" ]; then
+        echo "ERROR: reth-bsc binary is not executable: $RETH_BSC_BINARY_PATH"
+        echo "Please make the binary executable with: chmod +x $RETH_BSC_BINARY_PATH"
+        exit 1
     fi
+    
+    echo "✓ Validated: Will run all $size nodes with reth-bsc"
 }
 
 # stop geth client and reth-bsc
@@ -401,7 +382,7 @@ function start_reth_bsc() {
     echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
     
     # Run reth-bsc node
-    nohup env RUST_LOG=trace BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+    env RUST_LOG=info BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} MDBX_TX_BACKTRACE=1 RUST_BACKTRACE=full RUST_LIB_BACKTRACE=full MDBX_TX_BACKTRACE=1 BSC_SUBMIT_BUILT_PAYLOAD=true ${workspace}/${bin} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
@@ -423,9 +404,11 @@ function start_reth_bsc() {
         --mining.keystore-path ${keystore_path} \
         --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
         --log.stdout.format log-fmt \
-	--log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
-	 --metrics 0.0.0.0:6060 \
-	 --miner.gaslimit 140000000 \
+	    --log.file.directory ${workspace}/.local/node${nodeIndex}/logs \
+	    --metrics 0.0.0.0:6060 \
+	    --miner.gaslimit 140000000 \
+        --db.read-transaction-timeout 60 \
+        --engine.disable-parallel-sparse-trie \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
     
     if [ ${EnableSentryNode} = true ]; then
