@@ -553,7 +553,7 @@ function remote_reset_config() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
     ips=(${validator_ips_comma//,/ })
-    for ((i=0;i<${#ips[@]};i++)); do
+    for ((i=0;i<size;i++)); do
         dst_id=${ips2ids[${ips[i]}]}
         echo "reset config for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
@@ -585,7 +585,7 @@ function remote_start() {
     rm -rf /mnt/efs/${copyDir}/clusterNetwork
     cp -r ${workspace}/.local /mnt/efs/${copyDir}/clusterNetwork
     ips=(${validator_ips_comma//,/ })
-    for ((i=0;i<${#ips[@]};i++)); do
+    for ((i=0;i<size;i++)); do
         dst_id=${ips2ids[${ips[i]}]}
         echo "start node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
@@ -605,7 +605,7 @@ function remote_start() {
     cp ${workspace}/bin/geth /mnt/efs/${copyDir}/clusterNetwork/
     cp ${workspace}/bin/reth-bsc /mnt/efs/${copyDir}/clusterNetwork/
     ips=(${validator_ips_comma//,/ })
-    for ((i=0;i<${#ips[@]};i++));do
+    for ((i=0;i<size;i++));do
         dst_id=${ips2ids[${ips[i]}]}
         echo "start for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
@@ -639,7 +639,7 @@ function remote_upgrade() {
     \cp -f ${workspace}/qa-env-resource/upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
     \cp -f ${workspace}/qa-env-resource/reth-bsc-upgrade-single-validator.sh /mnt/efs/${copyDir}/clusterNetwork/
     ips=(${validator_ips_comma//,/ })
-    for ((i=0;i<${#ips[@]};i++)); do
+    for ((i=0;i<size;i++)); do
         dst_id=${ips2ids[${ips[i]}]}
         echo "upgrade config for node${i}, id: ${ips[i]}, dst_id: ${dst_id}"
         # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
