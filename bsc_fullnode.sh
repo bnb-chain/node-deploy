@@ -8,7 +8,7 @@ basedir=$(cd `dirname $0`; pwd)
 workspace=${basedir}
 source ${workspace}/.env
 
-stateScheme="hash"
+stateScheme="path"
 syncmode="full"
 gcmode="full"
 index=0
@@ -47,20 +47,18 @@ function init() {
 }
 
 function start() {
-  nohup ${workspace}/bin/geth --config $dst/config.toml --port $(( 31000 + $index ))  \
+  cp ${workspace}/bin/geth $dst/geth-$index-$syncmode
+  nohup $dst/geth-$index-$syncmode --config $dst/config.toml --port $(( 31000 + $index ))  \
   --datadir $dst --rpc.allow-unprotected-txs --allow-insecure-unlock \
   --ws.addr 0.0.0.0 --ws.port $(( 8600 + $index )) --http.addr 0.0.0.0 --http.port $(( 8600 + $index )) --http.corsdomain "*" \
   --metrics --metrics.addr 0.0.0.0 --metrics.port $(( 6100 + $index )) --metrics.expensive \
   --gcmode $gcmode --syncmode $syncmode --state.scheme ${stateScheme} $extraflags \
-  --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
+  --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} \
+  --override.fermi ${LastHardforkTime} --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} \
   --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
   --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-  > $dst/bsc-node.log 2>&1 &
+  >> $dst/bsc-node.log 2>&1 &
   echo $! > $dst/pid
-}
-
-function pruneblock() {
-  ${workspace}/bin/geth snapshot prune-block --datadir $dst --datadir.ancient $dst/geth/chaindata/ancient/chain
 }
 
 function stop() {
@@ -80,8 +78,8 @@ function clean() {
 
 CMD=$1
 case ${CMD} in
-start)
-    echo "===== start ===="
+reset)
+    echo "===== reset ===="
     clean
     init
     start
@@ -94,7 +92,7 @@ stop)
     ;;
 restart)
     echo "===== restart ===="
-    stop
+    stop || true
     start
     echo "===== end ===="
     ;;
@@ -103,14 +101,8 @@ clean)
     clean
     echo "===== end ===="
     ;;
-pruneblock)
-    echo "===== pruneblock ===="
-    stop
-    pruneblock
-    echo "===== end ===="
-    ;;
 *)
-    echo "Usage: bsc_fullnode.sh start|stop|restart|clean nodeIndex syncmode"
-    echo "like: bsc_fullnode.sh start 1 snap, it will startup a snapsync node1"
+    echo "Usage: bsc_fullnode.sh reset|stop|restart|clean nodeIndex syncmode"
+    echo "like: bsc_fullnode.sh reset 1 snap, it will startup a snapsync node1"
     ;;
 esac
