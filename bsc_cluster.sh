@@ -283,7 +283,9 @@ function start_reth_bsc() {
         .config.pragueTime = ($passedTime | tonumber) |
         .config.pascalTime = ($passedTime | tonumber) |
         .config.maxwellTime = ($passedTime | tonumber) |
-        .config.fermiTime = ($lastTime | tonumber)
+        .config.fermiTime = ($lastTime | tonumber) |
+        .config.osakaTime = ($lastTime | tonumber) |
+        .config.mendelTime = ($lastTime | tonumber)
     ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
 
     if [ ${EnableSentryNode} = true ]; then
