@@ -361,7 +361,9 @@ function start_reth_bsc() {
         .config.pragueTime = ($passedTime | tonumber) |
         .config.pascalTime = ($passedTime | tonumber) |
         .config.maxwellTime = ($passedTime | tonumber) |
-        .config.fermiTime = ($lastTime | tonumber)
+        .config.fermiTime = ($lastTime | tonumber) |
+        .config.osakaTime = ($lastTime | tonumber) |
+        .config.mendelTime = ($lastTime | tonumber)
     ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
 
     if [ ${EnableSentryNode} = true ]; then
@@ -537,10 +539,11 @@ function native_start() {
                 --pprof --pprof.addr localhost --pprof.port ${PProfPort} \
                 --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
                 --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
+                --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} \
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                 >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
-            
+
             if [ ${EnableSentryNode} = true ]; then
                 cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
                 nohup  ${workspace}/.local/sentry${i}/geth${i} --config ${workspace}/.local/sentry${i}/config.toml \
@@ -552,6 +555,7 @@ function native_start() {
                     --pprof --pprof.addr localhost --pprof.port $((PProfPort+1)) \
                     --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
                     --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
+                    --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} \
                     --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                     --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
                     >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
@@ -570,6 +574,7 @@ function native_start() {
             --pprof --pprof.addr localhost --pprof.port $((7160)) \
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
             --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${LastHardforkTime} \
+            --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
             >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
