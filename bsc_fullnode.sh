@@ -54,7 +54,7 @@ function start() {
   --metrics --metrics.addr 0.0.0.0 --metrics.port $(( 6100 + $index )) --metrics.expensive \
   --gcmode $gcmode --syncmode $syncmode --state.scheme ${stateScheme} $extraflags \
   --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} \
-  --override.fermi ${LastHardforkTime} --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} \
+  --override.fermi ${LastHardforkTime} --override.osaka ${LastHardforkTime} --override.mendel ${LastHardforkTime} --override.pasteur ${LastHardforkTime} \
   --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
   --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
   >> $dst/bsc-node.log 2>&1 &

@@ -219,6 +219,7 @@ function start_node() {
         --override.fermi ${LastHardforkTime} \
         --override.osaka ${LastHardforkTime} \
         --override.mendel ${LastHardforkTime} \
+        --override.pasteur ${LastHardforkTime} \
         --override.immutabilitythreshold ${FullImmutabilityThreshold} \
         --override.breatheblockinterval ${BreatheBlockInterval} \
         --override.minforblobrequest ${MinBlocksForBlobRequests} \
