@@ -40,6 +40,24 @@ go build
    - `.env`
 ```
 
+**Reth-BSC Configuration:**
+To use reth-bsc nodes instead of geth nodes for some validators, configure the following in `.env`:
+```bash
+# Path to the reth-bsc binary
+RETH_BSC_BINARY_PATH="/path/to/reth-bsc/target/debug/reth-bsc"
+
+# Number of nodes to run with reth-bsc (starting from node0)
+# For example: RETH_NODE_COUNT=2 will run node0 and node1 with reth-bsc, others with geth
+RETH_NODE_COUNT=1
+```
+
+Reth-BSC nodes are launched with BLS vote key CLI flags by default:
+- `--bls.keystore-path` and `--bls.keystore-password` are auto-detected from each node’s `bls/keystore` and `${KEYPASS}`.
+- To override, set either of the following envs before start (the script will pass them as CLI, which takes precedence over env inside reth):
+  - `BSC_BLS_PRIVATE_KEY` (dev only) → passes `--bls.private-key`
+  - `BSC_BLS_KEYSTORE_PATH` and `BSC_BLS_KEYSTORE_PASSWORD` → passes `--bls.keystore-path` and `--bls.keystore-password`
+
+
 5. Setup all nodes.
 two different ways, choose as you like.
 ```bash

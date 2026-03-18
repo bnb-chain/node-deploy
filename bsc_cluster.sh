@@ -16,10 +16,73 @@ gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
 
-# stop geth client
+# Validation function for reth-bsc configuration
+function validate_reth_config() {
+    # Check if RETH_NODE_COUNT is set and valid
+    if [ -z "$RETH_NODE_COUNT" ]; then
+        RETH_NODE_COUNT=0
+        echo "RETH_NODE_COUNT not set, defaulting to 0 (all geth nodes)"
+        return 0
+    fi
+    
+    # Check if RETH_NODE_COUNT is not greater than total cluster size
+    if [ $RETH_NODE_COUNT -gt $size ]; then
+        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be greater than BSC_CLUSTER_SIZE ($size)"
+        echo "Please adjust RETH_NODE_COUNT in .env file to be <= $size"
+        exit 1
+    fi
+    
+    # Check if RETH_NODE_COUNT is negative
+    if [ $RETH_NODE_COUNT -lt 0 ]; then
+        echo "ERROR: RETH_NODE_COUNT ($RETH_NODE_COUNT) cannot be negative"
+        echo "Please set RETH_NODE_COUNT to a value between 0 and $size in .env file"
+        exit 1
+    fi
+    
+    # If RETH_NODE_COUNT > 0, check if reth-bsc binary exists and is executable
+    if [ $RETH_NODE_COUNT -gt 0 ]; then
+        if [ -z "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: RETH_BSC_BINARY_PATH is not set in .env file"
+            echo "Please set RETH_BSC_BINARY_PATH to the path of your reth-bsc binary"
+            exit 1
+        fi
+        
+        if [ ! -f "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: reth-bsc binary not found at: $RETH_BSC_BINARY_PATH"
+            echo "Please check the RETH_BSC_BINARY_PATH in .env file and ensure the binary exists"
+            exit 1
+        fi
+        
+        if [ ! -x "$RETH_BSC_BINARY_PATH" ]; then
+            echo "ERROR: reth-bsc binary is not executable: $RETH_BSC_BINARY_PATH"
+            echo "Please make the binary executable with: chmod +x $RETH_BSC_BINARY_PATH"
+            exit 1
+        fi
+        
+        echo "✓ Validated: Will run $RETH_NODE_COUNT reth-bsc nodes (node0-node$((RETH_NODE_COUNT-1))) and $((size-RETH_NODE_COUNT)) geth nodes"
+    else
+        echo "✓ Validated: Will run all $size nodes with geth (no reth-bsc nodes)"
+    fi
+}
+
+# stop geth client and reth-bsc
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
+    if [ ! -z $ValIdx ]; then
+        if [ $ValIdx -lt $RETH_NODE_COUNT ]; then
+            # Stop reth-bsc for reth nodes (first RETH_NODE_COUNT nodes)
+            ps -ef | grep reth-bsc | grep -v grep | awk '{print $2}' | xargs -r kill
+        else
+            # Stop geth for other nodes
+            ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
+        fi
+    else
+        # Stop all nodes
+        ps -ef | grep reth-bsc | grep -v grep | awk '{print $2}' | xargs -r kill
+        for ((i = 0; i < size; i++)); do
+            ps -ef  | grep geth$i | grep config |awk '{print $2}' | xargs -r kill
+        done
+    fi
     sleep ${sleepBeforeStart}
 }
 
@@ -169,6 +232,10 @@ function initNetwork() {
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
             ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        elif  [ $i -lt $RETH_NODE_COUNT ] ; then
+            # Skip geth init for reth-bsc nodes, just copy genesis and create a dummy init log
+            cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${i}/genesis.json
+            echo "reth-bsc init: genesis.json copied for reth-bsc node${i}" > "${initLog}" 2>&1
         else
             ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
@@ -187,6 +254,166 @@ function initNetwork() {
         initLog=${workspace}/.local/fullnode0/init.log
         ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/fullnode0/*bsc.log*
+    fi
+}
+
+function start_reth_bsc() {
+    local nodeIndex=$1
+    local HTTPPort=$2
+    local WSPort=$3
+    local PassedForkTime=$4
+    local LastHardforkTime=$5
+    local rialtoHash=$6
+
+    # Copy and modify genesis.json for reth-bsc with correct fork timing
+    cp ${workspace}/genesis/genesis.json ${workspace}/.local/node${nodeIndex}/genesis.json
+
+    # Modify fork times in genesis.json for reth-bsc: all forks at PassedForkTime except fermi at LastHardforkTime
+    jq --arg passedTime "$PassedForkTime" --arg lastTime "$LastHardforkTime" '
+        .config.shanghaiTime = ($passedTime | tonumber) |
+        .config.keplerTime = ($passedTime | tonumber) |
+        .config.feynmanTime = ($passedTime | tonumber) |
+        .config.feynmanFixTime = ($passedTime | tonumber) |
+        .config.cancunTime = ($passedTime | tonumber) |
+        .config.haberTime = ($passedTime | tonumber) |
+        .config.haberFixTime = ($passedTime | tonumber) |
+        .config.lorentzTime = ($passedTime | tonumber) |
+        .config.bohrTime = ($passedTime | tonumber) |
+        .config.tychoTime = ($passedTime | tonumber) |
+        .config.pragueTime = ($passedTime | tonumber) |
+        .config.pascalTime = ($passedTime | tonumber) |
+        .config.maxwellTime = ($passedTime | tonumber) |
+        .config.fermiTime = ($lastTime | tonumber) |
+        .config.osakaTime = ($lastTime | tonumber) |
+        .config.mendelTime = ($lastTime | tonumber)
+    ' ${workspace}/.local/node${nodeIndex}/genesis.json > ${workspace}/.local/node${nodeIndex}/genesis_reth.json
+
+    if [ ${EnableSentryNode} = true ]; then
+        cp ${workspace}/.local/node${nodeIndex}/genesis_reth.json ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json
+    fi
+
+    # Get the first bootnode enode from BootstrapNodes configuration
+    # Extract the complete first bootnode entry (including the full enode:// URL)
+    bootnode_enode=$(grep -E "BootstrapNodes" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+    staic_enode=$(grep -E "StaticNodes" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+
+    # Extract discovery port from the current node's config.toml ListenAddr
+    discovery_port=$(grep "ListenAddr" ${workspace}/.local/node${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
+    auth_port=$((8551+nodeIndex))
+
+    # Detect keystore path dynamically
+    keystore_path=$(find ${workspace}/.local/node${nodeIndex}/keystore -name "UTC--*" -type f | head -1)
+    nodekey_path=$(find ${workspace}/.local/node${nodeIndex}/geth/nodekey -type f | head -1)
+    peer_conf=()
+    if [ -n "${bootnode_enode}" ]; then
+        peer_conf+=(--bootnodes ${bootnode_enode})
+    fi
+    if [ -n "${staic_enode}" ]; then
+        peer_conf+=(--trusted-peers ${staic_enode})
+    fi
+
+    # Determine BLS signer CLI args (prefer CLI over env)
+    # Priority:
+    # 1) BSC_BLS_PRIVATE_KEY -> use direct private key (dev only)
+    # 2) BSC_BLS_KEYSTORE_PATH + BSC_BLS_KEYSTORE_PASSWORD -> use provided keystore
+    # 3) Auto-detected keystore in node dir + KEYPASS from .env
+    bls_keystore_path=$(find ${workspace}/.local/node${nodeIndex}/bls/keystore -name "*.json" -type f | head -1)
+    bls_cli_args=()
+    if [ -n "${BSC_BLS_PRIVATE_KEY}" ]; then
+        bls_cli_args+=(--bls.private-key "${BSC_BLS_PRIVATE_KEY}")
+    elif [ -n "${BSC_BLS_KEYSTORE_PATH}" ] && [ -n "${BSC_BLS_KEYSTORE_PASSWORD}" ]; then
+        bls_cli_args+=(--bls.keystore-path "${BSC_BLS_KEYSTORE_PATH}" --bls.keystore-password "${BSC_BLS_KEYSTORE_PASSWORD}")
+    else
+        if [ -z "${bls_keystore_path}" ]; then
+            echo "WARNING: No BLS keystore found for node${nodeIndex}; reth-bsc may fall back to env if configured" >&2
+        fi
+        bls_cli_args+=(--bls.keystore-path "${bls_keystore_path}" --bls.keystore-password "${KEYPASS}")
+    fi
+
+    evn_conf=()
+    if [ ${EnableSentryNode} = true ]; then
+        evn_conf+=(--evn.enabled)
+        add_nodeid=$(grep -E "EVNNodeIDsToAdd" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${add_nodeid}" ]; then
+            evn_conf+=(--evn.add-nodeid ${add_nodeid})
+        fi
+        remove_nodeid=$(grep -E "EVNNodeIDsToRemove" ${workspace}/.local/node${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${remove_nodeid}" ]; then
+            evn_conf+=(--evn.remove-nodeid ${remove_nodeid})
+        fi
+    fi
+    echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
+
+    # Run reth-bsc node
+    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} BSC_SUBMIT_BUILT_PAYLOAD=${BSC_SUBMIT_BUILT_PAYLOAD} ${RETH_BSC_BINARY_PATH} node \
+        --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
+        --datadir ${workspace}/.local/node${nodeIndex} \
+        --genesis-hash ${rialtoHash} \
+        --disable-discovery \
+        --http \
+        --http.addr 0.0.0.0 \
+        --http.port ${HTTPPort} \
+        --p2p-secret-key ${nodekey_path} \
+        --ws \
+        --ws.addr 0.0.0.0 \
+        --ws.port $((${WSPort})) \
+        --discovery.addr 0.0.0.0 \
+        --discovery.port ${discovery_port} \
+        --authrpc.port ${auth_port} \
+        --port ${discovery_port} \
+        ${peer_conf[@]} \
+        ${evn_conf[@]} \
+        --mining.enabled \
+        --mining.min-gas-tip 1000000000 \
+        --mining.keystore-path ${keystore_path} \
+        --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
+        --log.stdout.format log-fmt --engine.persistence-threshold 10 --engine.memory-block-buffer-target 128 \
+        >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
+
+    if [ ${EnableSentryNode} = true ]; then
+        discovery_port=$(grep "ListenAddr" ${workspace}/.local/sentry${nodeIndex}/config.toml | sed 's/.*:\([0-9]*\).*/\1/')
+        nodekey_path=$(find ${workspace}/.local/sentry${i}/geth/nodekey -type f | head -1)
+        bootnode_enode=$(grep -E "BootstrapNodes" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        staic_enode=$(grep -E "StaticNodes" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        peer_conf=()
+        if [ -n "${bootnode_enode}" ]; then
+            peer_conf+=(--bootnodes ${bootnode_enode})
+        fi
+        if [ -n "${staic_enode}" ]; then
+            peer_conf+=(--trusted-peers ${staic_enode})
+        fi
+        evn_conf=()
+        evn_conf+=(--evn.enabled)
+        whitelist_nodeid=$(grep -E "EVNNodeIdsWhitelist" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${whitelist_nodeid}" ]; then
+            evn_conf+=(--evn.whitelist-nodeids ${whitelist_nodeid})
+        fi
+        proxyed_val=$(grep -E "ProxyedValidatorAddresses" ${workspace}/.local/sentry${nodeIndex}/config.toml | grep -o '\[".*"\]' | sed 's/\["//;s/"\]//;s/", "/,/g')
+        if [ -n "${proxyed_val}" ]; then
+            evn_conf+=(--evn.proxyed-validator ${proxyed_val})
+        fi
+
+        echo "sentry${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
+        nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+            --chain ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json \
+            --datadir ${workspace}/.local/sentry${nodeIndex} \
+            --genesis-hash ${rialtoHash} \
+            --disable-discovery \
+            --http \
+            --http.addr 0.0.0.0 \
+            --http.port $((HTTPPort+1)) \
+            --p2p-secret-key ${nodekey_path} \
+            --ws \
+            --ws.addr 0.0.0.0 \
+            --ws.port $((WSPort+1)) \
+            --discovery.addr 0.0.0.0 \
+            --discovery.port ${discovery_port} \
+            --authrpc.port $((auth_port+1)) \
+            --port ${discovery_port} \
+            ${peer_conf[@]} \
+            ${evn_conf[@]} \
+            --log.stdout.format log-fmt \
+            >> ${workspace}/.local/sentry${nodeIndex}/reth.log 2>&1 &
     fi
 }
 
@@ -233,35 +460,42 @@ function native_start() {
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
     rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
 
-    for ((i=0; i<size; i++)); do
+    ValIdx=$1
+    for ((i = 0; i < size; i++)); do
+        sleep 2
         datadir="${workspace}/.local/node${i}"
 
         # optional: ValIdx filtering
-        if [ ! -z "$1" ] && [ $i -ne $1 ]; then
+        if [ ! -z "$ValIdx" ] && [ $i -ne $ValIdx ]; then
             continue
         fi
 
         # get validator address
         cons_addr="0x$(jq -r .address ${datadir}/keystore/*)"
 
-        cp ${workspace}/bin/geth ${datadir}/geth${i}
+        HTTPPort=$((8545 + i*2))
+        WSPort=${HTTPPort}
+        MetricsPort=$((6060 + i*2))
+        PProfPort=$((7060 + i*2))
 
-        base=$((8545 + i*2))
-        start_node "node" $i $datadir "${datadir}/geth${i}" "${cons_addr}" \
-            $base $base $((6060+i*2)) $((7060+i*2))
-    done
-
-    if [ ${EnableSentryNode} = true ]; then
-        sleep 10
-        for ((i=0; i<size; i++)); do
-            datadir="${workspace}/.local/sentry${i}"
+        # Handle reth-bsc for first RETH_NODE_COUNT nodes, geth for others
+        if [ $i -lt $RETH_NODE_COUNT ]; then
+            # TODO: there are not supported flags, may support later
+            # --override.breatheblockinterval --override.minforblobrequest --MetricsPort
+            start_reth_bsc $i $HTTPPort $WSPort $PassedForkTime $LastHardforkTime $rialtoHash
+        else
             cp ${workspace}/bin/geth ${datadir}/geth${i}
+            start_node "node" $i $datadir "${datadir}/geth${i}" "${cons_addr}" \
+                $HTTPPort $WSPort $MetricsPort $PProfPort
 
-            base=$((8545 + i*2))
-            start_node "sentry" $i $datadir "${datadir}/geth${i}" "" \
-                $((base+1)) $((base+1)) $((6060+i*2+1)) $((7060+i*2+1))
-        done
-    fi
+            if [ ${EnableSentryNode} = true ]; then
+                sentry_datadir="${workspace}/.local/sentry${i}"
+                cp ${workspace}/bin/geth ${sentry_datadir}/geth${i}
+                start_node "sentry" $i $sentry_datadir "${sentry_datadir}/geth${i}" "" \
+                    $((HTTPPort+1)) $((WSPort+1)) $((MetricsPort+1)) $((PProfPort+1))
+            fi
+        fi
+    done
 
     if [ ${EnableFullNode} = true ]; then
         datadir="${workspace}/.local/fullnode0"
@@ -287,6 +521,7 @@ CMD=$1
 ValidatorIdx=$2
 case ${CMD} in
 reset)
+    validate_reth_config
     exit_previous
     create_validator
     prepare_bsc_client
@@ -297,12 +532,15 @@ reset)
     register_stakehub
     ;;
 stop)
+    validate_reth_config
     exit_previous $ValidatorIdx
     ;;
 start)
+    validate_reth_config
     native_start $ValidatorIdx
     ;;
 restart)
+    validate_reth_config
     exit_previous $ValidatorIdx
     native_start $ValidatorIdx
     ;;
