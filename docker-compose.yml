@@ -1,0 +1,23 @@
+services:
+  bsc-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bsc-toolbox:latest
+    container_name: bsc-toolbox
+    volumes:
+      - .:/node_deploy
+    # Opening RPC ports for 4 nodes: 8545, 8547, 8549, 8551
+    # Opening Metrics ports for 4 nodes: 6060, 6062, 6064, 6066
+    ports:
+      - "8545:8545"
+      - "8547:8547"
+      - "8549:8549"
+      - "8551:8551"
+      - "6060:6060"
+      - "6062:6062"
+      - "6064:6064"
+      - "6066:6066"
+    stdin_open: true
+    tty: true
+    command: /bin/bash

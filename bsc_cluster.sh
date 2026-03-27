@@ -19,7 +19,8 @@ sleepAfterStart=10
 # stop geth client
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
+    # if no geth exist just skip it
+    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
     sleep ${sleepBeforeStart}
 }
 
