@@ -20,4 +20,5 @@ services:
       - "6066:6066"
     stdin_open: true
     tty: true
-    command: /bin/bash
+    entrypoint: /usr/local/bin/entrypoint.sh
+    command: ["/bin/bash"]

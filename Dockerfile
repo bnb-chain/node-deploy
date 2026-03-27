@@ -38,6 +38,7 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN curl -L https://foundry.paradigm.xyz | bash && \
     /root/.foundry/bin/foundryup
 ENV PATH="/root/.foundry/bin:$PATH"
+ENV PATH="/node_deploy/bin:$PATH"
 
 # Setting up the workspace
 WORKDIR /node_deploy
@@ -47,6 +48,16 @@ WORKDIR /node_deploy
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Build and install the validator tool
+# By installing to /usr/local/bin, we ensure the binary is available even if the
+# /node_deploy directory is shadowed by a volume mount from the host.
+COPY create-validator/ ./create-validator/
+RUN cd create-validator && go build -o /usr/local/bin/create-validator
+
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Tool verification command
 # This ensures that when the image is built, all required tools are present and functional.
 RUN go version && \
@@ -55,7 +66,16 @@ RUN go version && \
     python3 --version && \
     poetry --version && \
     forge --version && \
-    jq --version
+    jq --version && \
+    create-validator --help
+
+# Add init check to .bashrc to warn users when they login
+RUN echo 'if [ -f /tmp/cluster_initializing ]; then' >> /root/.bashrc && \
+    echo '  echo "----------------------------------------------------"' >> /root/.bashrc && \
+    echo '  echo "  WARNING: Cluster is still initializing. Please wait!  "' >> /root/.bashrc && \
+    echo '  echo "----------------------------------------------------"' >> /root/.bashrc && \
+    echo '  echo ""' >> /root/.bashrc && \
+    echo 'fi' >> /root/.bashrc
 
 # Default command: show help or just stay open
 CMD ["bash"]

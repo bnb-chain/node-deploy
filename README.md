@@ -3,6 +3,10 @@
 
 ## Installation
 Before proceeding to the next steps, please ensure that the following packages and softwares are well installed in your local machine: 
+
+> [!TIP]
+> **Don't want to install these manually?** You can skip to the [Docker Version](#docker-version-recommended) section at the bottom of this file.
+
 - nodejs: v16.15.0
 - npm: 6.14.6
 - go: 1.24+
@@ -88,3 +92,40 @@ cd txblob
 go build
 ./txblob
 ```
+
+## Docker Version (Recommended)
+
+If you don't want to install all dependencies manually on your Mac/PC, you can use the Dockerized toolbox:
+
+1. **Build and Start Toolbox**:
+   This command builds the environment, compiles the `create-validator` tool, and **automatically initializes** the BSC cluster.
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Enter the Container**:
+   Once the cluster is initialized (you can check `docker logs -f bsc-toolbox`), enter the container to use the development tools:
+
+   ```bash
+   docker exec -it bsc-toolbox bash
+   ```
+
+3. **Validator Tool**:
+   The `create-validator` tool is pre-built and installed at `/usr/local/bin/create-validator`. You can run it from anywhere inside the container.
+
+4. **Observe from Host (Mac)**:
+   Access RPC at `http://localhost:8545`.
+
+### Common Observation Commands (Inside Container)
+
+Here are some useful commands to monitor the cluster:
+
+- **Check Block Height**:
+  `geth --exec "eth.blockNumber" attach .local/node0/geth.ipc`
+- **List P2P Peers**:
+  `geth --exec "admin.peers" attach .local/node0/geth.ipc`
+- **Check Node Info**:
+  `geth --exec "admin.nodeInfo" attach .local/node0/geth.ipc`
+- **Tail Logs**:
+  `tail -f .local/node0/bsc-node.log`
