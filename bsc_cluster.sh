@@ -16,7 +16,7 @@ gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
 
-# stop geth client
+# 1. Stop any previously running geth instances
 function exit_previous() {
     ValIdx=$1
     # if no geth exist just skip it
@@ -24,6 +24,7 @@ function exit_previous() {
     sleep ${sleepBeforeStart}
 }
 
+# 2. Cleanup .local and copy initial keys for validators
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local
@@ -34,6 +35,7 @@ function create_validator() {
     done
 }
 
+# 3. Build bsc geth client from source if configured
 function prepare_bsc_client() {
     if [ ${useLatestBscClient} = true ]; then
         if [ ! -f "${workspace}/bsc/Makefile" ]; then
@@ -43,7 +45,9 @@ function prepare_bsc_client() {
         cd ${workspace}/bsc && git pull && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
     fi
 }
-# reset genesis, but keep edited genesis-template.json
+
+# 4. Reset genesis submodule and install dependencies (Poetry, NPM, Forge)
+# This prepares the environment for generating the genesis block
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
         cd ${workspace} && git submodule update --init --recursive genesis
@@ -67,6 +71,7 @@ function reset_genesis() {
     git clone https://github.com/dapphub/ds-test
 }
 
+# 5. Generate validator configurations, hardfork times, and the final genesis.json
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
@@ -125,6 +130,7 @@ function prepare_config() {
     cp genesis-dev.json genesis.json
 }
 
+# 6. Initialize the geth network for each node using the generated genesis.json
 function initNetwork() {
     cd ${workspace}
     for ((i = 0; i < size; i++)); do
@@ -168,17 +174,13 @@ function initNetwork() {
         sed -i -e '/"<nil>"/d' ${workspace}/.local/node${i}/config.toml
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
-        if  [ $i -eq 0 ] ; then
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        else
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        fi
+        ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/node${i}/*bsc.log*
 
         if [ ${EnableSentryNode} = true ]; then
             sed -i -e '/"<nil>"/d' ${workspace}/.local/sentry${i}/config.toml
             initLog=${workspace}/.local/sentry${i}/init.log
-            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
             rm -f ${workspace}/.local/sentry${i}/*bsc.log*
         fi
     done
@@ -186,7 +188,7 @@ function initNetwork() {
         sed -i -e '/"<nil>"/d' ${workspace}/.local/fullnode0/config.toml
         sed -i -e 's/EnableEVNFeatures = true/EnableEVNFeatures = false/g' ${workspace}/.local/fullnode0/config.toml
         initLog=${workspace}/.local/fullnode0/init.log
-        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/fullnode0/*bsc.log*
     fi
 }
@@ -229,6 +231,7 @@ function start_node() {
         >> ${datadir}/bsc-node.log 2>&1 &
 }
 
+# 7. Start the nodes (Validators, Sentry, Full) in the background
 function native_start() {
     PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
@@ -275,6 +278,7 @@ function native_start() {
     sleep ${sleepAfterStart}
 }
 
+# 8. Use create-validator tool to register validator nodes on StakeHub
 function register_stakehub(){
     # wait feynman enable
     sleep 45
@@ -284,18 +288,20 @@ function register_stakehub(){
     done
 }
 
+# Command dispatcher
 CMD=$1
 ValidatorIdx=$2
 case ${CMD} in
 reset)
-    exit_previous
-    create_validator
-    prepare_bsc_client
-    reset_genesis
-    prepare_config
-    initNetwork
-    native_start
-    register_stakehub
+    # The 'reset' flow perform a clean initialization of the entire local cluster:
+    exit_previous      # Step 1: Kill old processes
+    create_validator   # Step 2: Prepare keys and .local/
+    prepare_bsc_client # Step 3: Build geth if necessary
+    reset_genesis      # Step 4: Setup genesis deps (Forge, Poetry, etc)
+    prepare_config     # Step 5: Generate genesis.json and node configs
+    initNetwork        # Step 6: Initialize Geth data directories
+    native_start       # Step 7: Start the cluster nodes
+    register_stakehub  # Step 8: Register validators with the network
     ;;
 stop)
     exit_previous $ValidatorIdx
