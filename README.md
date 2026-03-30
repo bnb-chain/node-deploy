@@ -129,3 +129,28 @@ Here are some useful commands to monitor the cluster:
   `geth --exec "admin.nodeInfo" attach .local/node0/geth.ipc`
 - **Tail Logs**:
   `tail -f .local/node0/bsc-node.log`
+
+### Monitoring and Metrics
+
+The cluster is configured to expose internal metrics for monitoring. These are accessible from your **(Host)**:
+
+- **Prometheus Metrics**: `http://localhost:6060/debug/metrics/prometheus`
+- **JSON Metrics**: `http://localhost:6060/debug/metrics`
+- **Performance Profiling (pprof)**: `http://localhost:7060/debug/pprof/`
+
+**Port Mapping for Nodes:**
+
+| Node | RPC (HTTP/WS) | Metrics (Prometheus) | pprof (Debug) |
+| :--- | :--- | :--- | :--- |
+| **Node 0** | 8545 | 6060 | 7060 |
+| **Node 1** | 8547 | 6062 | 7062 |
+| **Node 2** | 8549 | 6064 | 7064 |
+| **Node 3** | 8551 | 6066 | 7066 |
+
+### Storage Optimization
+
+To prevent rapid disk space exhaustion during local testing, this setup uses the following optimizations:
+
+- **DB Engine**: Forced to `leveldb` (more space-efficient than Pebble for small clusters).
+- **State Scheme**: Set to `hash` to significantly reduce state storage size compared to the default path-based scheme.
+- **Auto-Reset**: The `docker compose up` command triggers a full reset by default, ensuring you always start with a clean state.
