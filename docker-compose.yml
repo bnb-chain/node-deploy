@@ -18,6 +18,10 @@ services:
       - "6062:6062"
       - "6064:6064"
       - "6066:6066"
+      - "7060:7060"
+      - "7062:7062"
+      - "7064:7064"
+      - "7066:7066"
     stdin_open: true
     tty: true
     entrypoint: /usr/local/bin/entrypoint.sh
