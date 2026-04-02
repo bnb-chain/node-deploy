@@ -345,7 +345,11 @@ function start_reth_bsc() {
     echo "node${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
 
     # Run reth-bsc node
-    nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} BSC_SUBMIT_BUILT_PAYLOAD=${BSC_SUBMIT_BUILT_PAYLOAD} ${RETH_BSC_BINARY_PATH} node \
+    reth_env=(RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} BSC_SUBMIT_BUILT_PAYLOAD=${BSC_SUBMIT_BUILT_PAYLOAD})
+    if [ -n "${RETH_JEMALLOC_PROF}" ]; then
+        reth_env+=(_RJEM_MALLOC_CONF="${RETH_JEMALLOC_PROF}")
+    fi
+    nohup env "${reth_env[@]}" ${RETH_BSC_BINARY_PATH} node \
         --chain ${workspace}/.local/node${nodeIndex}/genesis_reth.json \
         --datadir ${workspace}/.local/node${nodeIndex} \
         --genesis-hash ${rialtoHash} \
@@ -367,7 +371,8 @@ function start_reth_bsc() {
         --mining.min-gas-tip 1000000000 \
         --mining.keystore-path ${keystore_path} \
         --mining.keystore-password ${KEYPASS} "${bls_cli_args[@]}" \
-        --log.stdout.format log-fmt --engine.persistence-threshold 10 --engine.memory-block-buffer-target 128 \
+        ${EnableMetrics:+--metrics 0.0.0.0:$((9001 + nodeIndex * 2))} \
+        --log.stdout.format terminal --engine.persistence-threshold 10 --engine.memory-block-buffer-target 128 \
         >> ${workspace}/.local/node${nodeIndex}/reth.log 2>&1 &
 
     if [ ${EnableSentryNode} = true ]; then
@@ -394,7 +399,7 @@ function start_reth_bsc() {
         fi
 
         echo "sentry${nodeIndex}, nodekey_path: ${nodekey_path}, peer_conf: ${peer_conf[@]}, evn_conf: ${evn_conf[@]}"
-        nohup env RUST_LOG=debug BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval} ${RETH_BSC_BINARY_PATH} node \
+        nohup env "${reth_env[@]}" ${RETH_BSC_BINARY_PATH} node \
             --chain ${workspace}/.local/sentry${nodeIndex}/genesis_reth.json \
             --datadir ${workspace}/.local/sentry${nodeIndex} \
             --genesis-hash ${rialtoHash} \
@@ -412,7 +417,7 @@ function start_reth_bsc() {
             --port ${discovery_port} \
             ${peer_conf[@]} \
             ${evn_conf[@]} \
-            --log.stdout.format log-fmt \
+            --log.stdout.format terminal \
             >> ${workspace}/.local/sentry${nodeIndex}/reth.log 2>&1 &
     fi
 }
@@ -436,8 +441,8 @@ function start_node() {
         --rpc.allow-unprotected-txs --allow-insecure-unlock \
         --ws --ws.addr 0.0.0.0 --ws.port ${ws_port} \
         --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
-        --metrics --metrics.addr localhost --metrics.port ${metrics_port} \
-        --pprof --pprof.addr localhost --pprof.port ${pprof_port} \
+        ${EnableMetrics:+--metrics --metrics.addr localhost --metrics.port ${metrics_port}} \
+        ${EnableMetrics:+--pprof --pprof.addr localhost --pprof.port ${pprof_port}} \
         --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
         --rialtohash ${rialtoHash} \
         --override.passedforktime ${PassedForkTime} \
