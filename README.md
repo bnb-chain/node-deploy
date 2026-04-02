@@ -154,6 +154,10 @@ Grafana will be available at [http://localhost:3000](http://localhost:3000) (adm
 
 reth-bsc nodes can be profiled using jemalloc's built-in heap profiler.
 
+> **Note:** Before building with profiling support, the `reth-bsc` repo requires two small
+> pending changes that have not yet been pushed upstream. See
+> [reth-bsc-pending-changes.md](reth-bsc-pending-changes.md) for the exact edits needed.
+
 ### 1. Build reth-bsc with profiling support
 
 ```bash
