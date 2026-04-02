@@ -9,3 +9,6 @@
 
 .idea/
 lib/
+.venv/
+.env
+voteJournal/votes.jsonl
