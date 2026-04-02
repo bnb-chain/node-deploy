@@ -95,62 +95,70 @@ go build
 
 ## Docker Version (Recommended)
 
-If you don't want to install all dependencies manually on your Mac/PC, you can use the Dockerized toolbox:
+To run a fully containerized, isolated local BSC cluster without installing dependencies on your host machine, use the provided `Makefile` which handles the 2-phase orchestration automatically.
 
-1. **Build and Start Toolbox**:
-   This command builds the environment, compiles the `create-validator` tool, and **automatically initializes** the BSC cluster.
+### Architecture Workflow
 
-   ```bash
-   docker compose up -d --build
-   ```
+```mermaid
+sequenceDiagram
+    participant User
+    participant Makefile
+    participant Toolbox as Toolbox (Docker)
+    participant HostFS as Host FileSystem
+    participant Compose as Docker Compose
+    participant Docker as Docker Engine
 
-2. **Enter the Container**:
-   Once the cluster is initialized (you can check `docker logs -f bsc-toolbox`), enter the container to use the development tools:
+    User->>Makefile: make cluster-up
 
-   ```bash
-   docker exec -it bsc-toolbox bash
-   ```
+    Note over Makefile,Toolbox: Phase 1: Initialization (prepare)
+    Makefile->>Toolbox: Start disposable 'bsc-toolbox' container and execute script
 
-3. **Validator Tool**:
-   The `create-validator` tool is pre-built and installed at `/usr/local/bin/create-validator`. You can run it from anywhere inside the container.
+    Toolbox->>HostFS: Compile and save 'geth' binary
+    Toolbox->>HostFS: Generate genesis, keystores, config.toml (.local/)
+    Toolbox->>HostFS: Generate .env.cluster (cluster params, node count)
+    Toolbox->>HostFS: Generate docker-compose.cluster.yml (based on env)
 
-4. **Observe from Host (Mac)**:
-   Access RPC at `http://localhost:8545`.
+    Toolbox-->>Makefile: Exit (container removed)
 
-### Common Observation Commands (Inside Container)
+    Note over Makefile,Compose: Phase 2: Start Cluster (up)
+    Makefile->>Compose: docker compose -f docker-compose.cluster.yml up -d
 
-Here are some useful commands to monitor the cluster:
+    Compose->>HostFS: Read docker-compose.cluster.yml
+    Compose->>HostFS: Load .env.cluster (env injection)
 
-- **Check Block Height**:
-  `geth --exec "eth.blockNumber" attach .local/node0/geth.ipc`
-- **List P2P Peers**:
-  `geth --exec "admin.peers" attach .local/node0/geth.ipc`
-- **Check Node Info**:
-  `geth --exec "admin.nodeInfo" attach .local/node0/geth.ipc`
-- **Tail Logs**:
-  `tail -f .local/node0/bsc-node.log`
+    Compose->>Docker: Create & start N bsc-node-X containers
 
-### Monitoring and Metrics
+    Docker->>HostFS: Mount volumes (./ -> /node_deploy)
 
-The cluster is configured to expose internal metrics for monitoring. These are accessible from your **(Host)**:
+    Docker->>Docker: Run node_entrypoint.sh inside each container
+    Docker->>HostFS: Containers read config.toml / genesis / keystore
 
-- **Prometheus Metrics**: `http://localhost:6060/debug/metrics/prometheus`
-- **JSON Metrics**: `http://localhost:6060/debug/metrics`
-- **Performance Profiling (pprof)**: `http://localhost:7060/debug/pprof/`
+    Docker-->>User: Cluster running (N nodes)
+```
 
-**Port Mapping for Nodes:**
+### Quick Commands
 
-| Node | RPC (HTTP/WS) | Metrics (Prometheus) | pprof (Debug) |
-| :--- | :--- | :--- | :--- |
-| **Node 0** | 8545 | 6060 | 7060 |
-| **Node 1** | 8547 | 6062 | 7062 |
-| **Node 2** | 8549 | 6064 | 7064 |
-| **Node 3** | 8551 | 6066 | 7066 |
+- **`make cluster-up`**: One-click start. It runs the initialization phase (using a disposable toolbox container) and then starts the isolated nodes via Docker Compose.
+- **`make cluster-down`**: Safely stop all running nodes.
+- **`make cluster-logs`**: Stream aggregated, color-coded logs from all running nodes.
+- **`make cluster-restart`**: Fast restart the cluster (nodes only). Use this if you manually modified `.local/nodeX/config.toml` and want to apply changes without wiping the blockchain data.
+- **`make cluster-clean`**: **WARNING**. Wipes all generated data (`.local/`), genesis files, and temporary yaml configs. Use this to reset the chain back to block zero.
 
-### Storage Optimization
+### Node Ports Mapping
 
-To prevent rapid disk space exhaustion during local testing, this setup uses the following optimizations:
+Each node runs identically on port `8545` internally. Host mapping is structured sequentially:
 
-- **DB Engine**: Forced to `leveldb` (more space-efficient than Pebble for small clusters).
-- **State Scheme**: Set to `hash` to significantly reduce state storage size compared to the default path-based scheme.
-- **Auto-Reset**: The `docker compose up` command triggers a full reset by default, ensuring you always start with a clean state.
+| Node | RPC (HTTP/WS) | Metrics (Prometheus) | pprof (Debug) | P2P (TCP/UDP) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Node 0** | 8545 | 6060 | 7060 | 30311 |
+| **Node 1** | 8547 | 6062 | 7062 | 30312 |
+| **Node 2** | 8549 | 6064 | 7064 | 30313 |
+| **Node 3** | 8551 | 6066 | 7066 | 30314 |
+
+For example, to check the block height of Node 1:
+`curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://127.0.0.1:8547`
+
+### Logging
+
+By default, nodes output all their logs directly to the Docker logging driver (STDOUT). You can view them using:
+`docker logs -f bsc-node-0`

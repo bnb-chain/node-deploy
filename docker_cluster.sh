@@ -13,18 +13,8 @@ size=$((BSC_CLUSTER_SIZE))
 stateScheme="hash"
 dbEngine="leveldb"
 gcmode="full"
-sleepBeforeStart=15
-sleepAfterStart=10
 
-# 1. Stop any previously running geth instances
-function exit_previous() {
-    ValIdx=$1
-    # if no geth exist just skip it
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
-    sleep ${sleepBeforeStart}
-}
-
-# 2. Cleanup .local and copy initial keys for validators
+# 1. Cleanup .local and copy initial keys for validators
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local
@@ -35,18 +25,18 @@ function create_validator() {
     done
 }
 
-# 3. Build bsc geth client from source if configured
+# 2. Build bsc geth client from source if configured
 function prepare_bsc_client() {
     if [ ${useLatestBscClient} = true ]; then
         if [ ! -f "${workspace}/bsc/Makefile" ]; then
             cd ${workspace}
             git clone https://github.com/bnb-chain/bsc.git
         fi
-        cd ${workspace}/bsc && git pull && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
+        cd ${workspace}/bsc && git pull && make geth && cp -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
     fi
 }
 
-# 4. Reset genesis submodule and install dependencies (Poetry, NPM, Forge)
+# 3. Reset genesis submodule and install dependencies (Poetry, NPM, Forge)
 # This prepares the environment for generating the genesis block
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
@@ -79,7 +69,7 @@ function reset_genesis() {
     git clone https://github.com/dapphub/ds-test
 }
 
-# 5. Generate validator configurations, hardfork times, and the final genesis.json
+# 4. Generate validator configurations, hardfork times, and the final genesis.json
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
@@ -149,7 +139,7 @@ function prepare_config() {
     cp genesis-dev.json genesis.json
 }
 
-# 6. Initialize the geth network for each node using the generated genesis.json
+# 5. Initialize the geth network for each node using the generated genesis.json
 function initNetwork() {
     cd ${workspace}
     # 1. Assigning P2P Identities
@@ -218,94 +208,142 @@ function initNetwork() {
     fi
 }
 
-function start_node() {
-    local type=$1       # node | sentry | full
-    local idx=$2        # index (validator/sentry)，full default 0
-    local datadir=$3
-    local geth_bin=$4
-    local cons_addr=$5
-    local http_port=$6
-    local ws_port=$7
-    local metrics_port=$8
-    local pprof_port=$9
-
-    # update `config` in genesis.json
-    # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
-    nohup ${geth_bin} --config ${datadir}/config.toml \
-        --datadir ${datadir} \
-        --nodekey ${datadir}/geth/nodekey \
-        --cache 512 \
-        --rpc.allow-unprotected-txs --allow-insecure-unlock \
-        --ws --ws.addr 0.0.0.0 --ws.port ${ws_port} \
-        --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
-        --metrics --metrics.addr 0.0.0.0 --metrics.port ${metrics_port} \
-        --pprof --pprof.addr 0.0.0.0 --pprof.port ${pprof_port} \
-        --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
-        --rialtohash ${rialtoHash} \
-        --override.passedforktime ${PassedForkTime} \
-        --override.lorentz ${PassedForkTime} \
-        --override.maxwell ${PassedForkTime} \
-        --override.fermi ${LastHardforkTime} \
-        --override.osaka ${LastHardforkTime} \
-        --override.mendel ${LastHardforkTime} \
-        --override.pasteur ${LastHardforkTime} \
-        --override.immutabilitythreshold ${FullImmutabilityThreshold} \
-        --override.breatheblockinterval ${BreatheBlockInterval} \
-        --override.minforblobrequest ${MinBlocksForBlobRequests} \
-        --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-        $( [ "${type}" = "node" ] && echo "--mine --vote --unlock ${cons_addr} --miner.etherbase ${cons_addr} --password ${datadir}/password.txt --blspassword ${datadir}/password.txt" ) \
-        >> ${datadir}/bsc-node.log 2>&1 &
-}
-
-# 7. Start the nodes (Validators, Sentry, Full) in the background
-function native_start() {
-    PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
-    LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
-    rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
-
-    # Starting Validator Nodes
+# 6. Patch P2P network to use Docker DNS instead of localhost
+function patch_p2p_network() {
+    # Replace 127.0.0.1 IPs in config.toml with docker-compose service names
     for ((i=0; i<size; i++)); do
-        datadir="${workspace}/.local/node${i}"
-
-        # optional: ValIdx filtering
-        if [ ! -z "$1" ] && [ $i -ne $1 ]; then
-            continue
+        p2p_port=$((30311 + i))
+        if [ -f "${workspace}/.local/node${i}/config.toml" ]; then
+            # Replace localhost representation of this node's P2P endpoint in ALL configs
+            find ${workspace}/.local -name "config.toml" -type f -exec sed -i -e "s/127.0.0.1:${p2p_port}/bsc-node-${i}:${p2p_port}/g" {} \;
         fi
-
-        # get validator address
-        cons_addr="0x$(jq -r .address ${datadir}/keystore/*)"
-
-        # Copying Geth binaries to unique names (geth0, geth1...) 
-        # for easier node-specific monitoring in htop.
-        cp ${workspace}/bin/geth ${datadir}/geth${i}
-
-        base=$((8545 + i*2))
-        start_node "node" $i $datadir "${datadir}/geth${i}" "${cons_addr}" \
-            $base $base $((6060+i*2)) $((7060+i*2))
     done
 
-    # Starting Sentry Nodes
+    # Handle sentry
     if [ ${EnableSentryNode} = true ]; then
-        sleep 10
         for ((i=0; i<size; i++)); do
-            datadir="${workspace}/.local/sentry${i}"
-            cp ${workspace}/bin/geth ${datadir}/geth${i}
-
-            base=$((8545 + i*2))
-            start_node "sentry" $i $datadir "${datadir}/geth${i}" "" \
-                $((base+1)) $((base+1)) $((6060+i*2+1)) $((7060+i*2+1))
+            p2p_port=$((30411 + i))
+            find ${workspace}/.local -name "config.toml" -type f -exec sed -i -e "s/127.0.0.1:${p2p_port}/bsc-sentry-${i}:${p2p_port}/g" {} \;
         done
     fi
 
+    # Handle fullnode
     if [ ${EnableFullNode} = true ]; then
-        datadir="${workspace}/.local/fullnode0"
-        cp ${workspace}/bin/geth ${datadir}/geth0
-
-        start_node "full" 0 $datadir "${datadir}/geth0" "" \
-            8645 8645 6160 7160
+        p2p_port=30511
+        find ${workspace}/.local -name "config.toml" -type f -exec sed -i -e "s/127.0.0.1:${p2p_port}/bsc-fullnode-0:${p2p_port}/g" {} \;
     fi
 
-    sleep ${sleepAfterStart}
+    # Force Geth to output to STDOUT instead of file by removing the default FilePath config
+    find ${workspace}/.local -name "config.toml" -type f -exec sed -i -e '/FilePath/d' {} \;
+}
+
+# 7. Extract variables and generate docker-compose file
+function generate_compose() {
+    PassedForkTime=$(cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}')
+    LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
+    rialtoHash=$(cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}')
+
+    echo "Generating .env.cluster..."
+    cat <<EOF > ${workspace}/.env.cluster
+RIALTO_HASH=${rialtoHash}
+PASSED_FORK_TIME=${PassedForkTime}
+LAST_HARDFORK_TIME=${LastHardforkTime}
+FULL_IMMUTABILITY_THRESHOLD=${FullImmutabilityThreshold}
+BREATHE_BLOCK_INTERVAL=${BreatheBlockInterval}
+MIN_FOR_BLOB_REQUESTS=${MinBlocksForBlobRequests}
+DEFAULT_EXTRA_RESERVE=${DefaultExtraReserveForBlobRequests}
+EOF
+
+    COMPOSE_FILE=${workspace}/docker-compose.cluster.yml
+    echo "Generating ${COMPOSE_FILE}..."
+    echo "services:" > $COMPOSE_FILE
+
+    # Validators
+    for ((i=0; i<size; i++)); do
+        base_rpc=$((8545 + i*2))
+        base_metrics=$((6060 + i*2))
+        base_pprof=$((7060 + i*2))
+        p2p_port=$((30311 + i))
+        
+        cat <<EOF >> $COMPOSE_FILE
+  bsc-node-${i}:
+    image: bsc-toolbox:latest
+    container_name: bsc-node-${i}
+    env_file: .env.cluster
+    environment:
+      - NODE_TYPE=node
+      - NODE_INDEX=${i}
+    volumes:
+      - .:/node_deploy
+    ports:
+      - "${base_rpc}:8545" # RPC & WS
+      - "${base_metrics}:6060" # Metrics
+      - "${base_pprof}:7060" # Pprof
+      - "${p2p_port}:${p2p_port}" # P2P TCP
+      - "${p2p_port}:${p2p_port}/udp" # P2P UDP
+    command: ["/node_deploy/node_entrypoint.sh"]
+
+EOF
+    done
+
+    # Sentry
+    if [ ${EnableSentryNode} = true ]; then
+        for ((i=0; i<size; i++)); do
+            base_rpc=$((8545 + i*2 + 100)) # Shift sentry ports
+            base_metrics=$((6060 + i*2 + 100))
+            base_pprof=$((7060 + i*2 + 100))
+            p2p_port=$((30411 + i))
+            
+            cat <<EOF >> $COMPOSE_FILE
+  bsc-sentry-${i}:
+    image: bsc-toolbox:latest
+    container_name: bsc-sentry-${i}
+    env_file: .env.cluster
+    environment:
+      - NODE_TYPE=sentry
+      - NODE_INDEX=${i}
+    volumes:
+      - .:/node_deploy
+    ports:
+      - "${base_rpc}:8545"
+      - "${base_metrics}:6060"
+      - "${base_pprof}:7060"
+      - "${p2p_port}:${p2p_port}"
+      - "${p2p_port}:${p2p_port}/udp"
+    command: ["/node_deploy/node_entrypoint.sh"]
+
+EOF
+        done
+    fi
+
+    # Full Node
+    if [ ${EnableFullNode} = true ]; then
+        base_rpc=8645
+        base_metrics=6160
+        base_pprof=7160
+        p2p_port=30511
+        cat <<EOF >> $COMPOSE_FILE
+  bsc-fullnode-0:
+    image: bsc-toolbox:latest
+    container_name: bsc-fullnode-0
+    env_file: .env.cluster
+    environment:
+      - NODE_TYPE=full
+      - NODE_INDEX=0
+    volumes:
+      - .:/node_deploy
+    ports:
+      - "${base_rpc}:8545"
+      - "${base_metrics}:6060"
+      - "${base_pprof}:7060"
+      - "${p2p_port}:${p2p_port}"
+      - "${p2p_port}:${p2p_port}/udp"
+    command: ["/node_deploy/node_entrypoint.sh"]
+
+EOF
+    fi
+
+    echo "Generated \${COMPOSE_FILE} successfully!"
 }
 
 # 8. Use create-validator tool to register validator nodes on StakeHub
@@ -320,30 +358,22 @@ function register_stakehub(){
 
 # Command dispatcher
 CMD=$1
-ValidatorIdx=$2
 case ${CMD} in
-reset)
-    # The 'reset' flow perform a clean initialization of the entire local cluster:
-    exit_previous      # Step 1: Kill old processes
-    create_validator   # Step 2: Prepare keys and .local/
-    prepare_bsc_client # Step 3: Build geth if necessary
-    reset_genesis      # Step 4: Setup genesis deps (Forge, Poetry, etc)
-    prepare_config     # Step 5: Generate genesis.json and node configs
-    initNetwork        # Step 6: Initialize Geth data directories
-    native_start       # Step 7: Start the cluster nodes
-    register_stakehub  # Step 8: Register validators with the network
+prepare)
+    echo "Preparing Docker cluster configs..."
+    create_validator   # Step 1: Prepare keys and .local/
+    prepare_bsc_client # Step 2: Build geth if necessary
+    reset_genesis      # Step 3: Setup genesis deps (Forge, Poetry, etc)
+    prepare_config     # Step 4: Generate genesis.json and node configs
+    initNetwork        # Step 5: Initialize Geth data directories
+    patch_p2p_network  # Step 6: Patch 127.0.0.1 in configs to docker DNS
+    generate_compose   # Step 7: Generate .env.cluster and docker-compose
+    echo "Preparation complete!"
     ;;
-stop)
-    exit_previous $ValidatorIdx
-    ;;
-start)
-    native_start $ValidatorIdx
-    ;;
-restart)
-    exit_previous $ValidatorIdx
-    native_start $ValidatorIdx
+register)
+    register_stakehub
     ;;
 *)
-    echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx]"
+    echo "Usage: docker_cluster.sh | prepare | register"
     ;;
 esac
