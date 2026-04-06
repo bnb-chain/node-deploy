@@ -379,14 +379,22 @@ prepare)
 register)
     register_stakehub
     ;;
-wait-rpc)
-    echo "Waiting for RPC to be available at http://localhost:8545..."
-    until curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:8545 > /dev/null; do
-      printf "."
-      sleep 2
-    done
-    echo "RPC is ready!"
-    ;;
+    wait-rpc)
+        echo "Waiting for RPC to be available at http://localhost:8545..."
+        MAX_WAIT=300 # 5 minutes
+        ELAPSED=0
+        until curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:8545 > /dev/null 2>&1; do
+            printf "."
+            sleep 2
+            ELAPSED=$((ELAPSED + 2))
+            if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+                echo ""
+                echo "ERROR: RPC not available after ${MAX_WAIT}s. Aborting."
+                exit 1
+            fi
+        done
+        echo "RPC is ready!"
+        ;;
 *)
     echo "Usage: docker_cluster.sh | prepare | register"
     ;;
