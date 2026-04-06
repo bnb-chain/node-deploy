@@ -134,11 +134,20 @@ sequenceDiagram
     Docker->>HostFS: Containers read config.toml / genesis / keystore
 
     Docker-->>User: Cluster running (N nodes)
+
+    Note over Makefile,Toolbox: Phase 3: Validator Registration (register)
+    Makefile->>Makefile: Wait for RPC (localhost:8545 ready)
+    Makefile->>Toolbox: Start new Toolbox container inside 'bsc_cluster_network'
+    Toolbox->>HostFS: Load .env (get RPC_URL)
+    Toolbox->>Docker: Send 'Register' Transactions (via RPC to Node 0)
+    Toolbox-->>Makefile: Exit (registration tasks submitted)
+
+    Note over User,Docker: Local BSC Cluster active with registered validators
 ```
 
 ### Quick Commands
 
-- **`make cluster-up`**: One-click start. It runs the initialization phase (using a disposable toolbox container) and then starts the isolated nodes via Docker Compose.
+- **`make cluster-up`**: One-click start. It runs the initialization phase, starts the isolated nodes via Docker Compose, and then automatically handles validator registration on StakeHub.
 - **`make cluster-down`**: Safely stop all running nodes.
 - **`make cluster-logs`**: Stream aggregated, color-coded logs from all running nodes.
 - **`make cluster-restart`**: Fast restart the cluster (nodes only). Use this if you manually modified `.local/nodeX/config.toml` and want to apply changes without wiping the blockchain data.

@@ -343,13 +343,19 @@ EOF
 EOF
     fi
 
+    cat <<EOF >> $COMPOSE_FILE
+
+networks:
+  default:
+    name: bsc_cluster_network
+EOF
+
     echo "Generated \${COMPOSE_FILE} successfully!"
 }
 
 # 8. Use create-validator tool to register validator nodes on StakeHub
 function register_stakehub(){
     # wait feynman enable
-    sleep 45
     for ((i = 0; i < size; i++));do
         create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
             --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
@@ -372,6 +378,14 @@ prepare)
     ;;
 register)
     register_stakehub
+    ;;
+wait-rpc)
+    echo "Waiting for RPC to be available at http://localhost:8545..."
+    until curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:8545 > /dev/null; do
+      printf "."
+      sleep 2
+    done
+    echo "RPC is ready!"
     ;;
 *)
     echo "Usage: docker_cluster.sh | prepare | register"
