@@ -62,11 +62,63 @@ function reset_genesis() {
     npm install
     
     # 3. Clean up and reinstall Foundry framework components (Standard Library & Tests)
+    # Direct git clone instead of `forge install --no-git` because the latter
+    # fails inside a parent git repo with "not a git repository: ../../.git/modules/lib/ds-test"
+    # when forge tries to recursively init forge-std's ds-test submodule.
     rm -rf lib/forge-std
-    forge install --no-git foundry-rs/forge-std@v1.7.3
+    git clone --depth 1 --branch v1.7.3 https://github.com/foundry-rs/forge-std.git lib/forge-std
     cd lib/forge-std/lib
     rm -rf ds-test
     git clone https://github.com/dapphub/ds-test
+}
+
+# Patches genesis to disable fast-finality (Plato/Luban) for private chains with N>4 validators.
+#
+# Why: BSC's Plato hardfork (BLS fast finality) activates at block 7 in the default
+# genesis-template. With >4 validators across a WAN, race conditions at chain start
+# cause DoubleSign forks at block 2, and the fast-finality reorg path
+# (consensus/parlia/snapshot.go:411) panics on misshapen attestation state.
+#
+# Empirically: 4 validators → works. 21 validators across 3 GCP regions → consistently
+# panics at block 8-9. See https://github.com/bnb-chain/bsc/blob/master/consensus/parlia/snapshot.go
+# Mainnet didn't bootstrap with Plato either; Plato activated years into a running chain.
+#
+# This function pushes Plato/Luban (and dependent Berlin/London/Hertz) past chain
+# lifetime, plus disables time-based forks that depend on Plato. The chain runs
+# vanilla Parlia (probabilistic finality, ~12-block depth).
+#
+# Toggle: set DISABLE_FAST_FINALITY=false in .env to keep upstream behavior (default 4-validator setup).
+function patch_for_private_chain() {
+    if [ "${DISABLE_FAST_FINALITY:-true}" != "true" ]; then
+        echo "patch_for_private_chain: DISABLE_FAST_FINALITY=false, skipping"
+        return 0
+    fi
+
+    local TPL=${workspace}/genesis/genesis-template.json
+    sed -i 's/"lubanBlock": 6,/"lubanBlock": 100000000,/'                $TPL
+    sed -i 's/"platoBlock": 7,/"platoBlock": 100000000,/'               $TPL
+    sed -i 's/"berlinBlock": 8,/"berlinBlock": 100000001,/'             $TPL
+    sed -i 's/"londonBlock": 8,/"londonBlock": 100000001,/'             $TPL
+    sed -i 's/"hertzBlock": 8,/"hertzBlock": 100000002,/'               $TPL
+    sed -i 's/"hertzfixBlock": 8,/"hertzfixBlock": 100000002,/'         $TPL
+    sed -i 's/"bohrTime": 0,/"bohrTime": null,/'                       $TPL
+    sed -i 's/"pascalTime": 0,/"pascalTime": null,/'                   $TPL
+    sed -i 's/"pragueTime": 0,/"pragueTime": null,/'                   $TPL
+    sed -i 's/"lorentzTime": 0,/"lorentzTime": null,/'                 $TPL
+    sed -i 's/"maxwellTime": 0,/"maxwellTime": null,/'                 $TPL
+    sed -i 's/"fermiTime": 0,/"fermiTime": null,/'                     $TPL
+    sed -i 's/"haberFixTime": 0,/"haberFixTime": null,/'               $TPL
+    grep -q '"lubanBlock": 100000000' $TPL || { echo "patch_for_private_chain: luban patch failed" >&2; exit 1; }
+    echo "patch_for_private_chain: pushed Plato/Luban to block 100000000, disabled time-based post-Plato forks"
+
+    # Sort validators ascending by consensusAddr in extraData.
+    # Parlia's snapshot.validators() returns ascending-sorted; if extraData order
+    # differs, in-turn calculation goes to wrong validator → "unauthorized validator" at block 1.
+    local VT=${workspace}/genesis/scripts/validators.template
+    if ! grep -q "// SORT_PATCHED" $VT; then
+        sed -i 's|function extraDataSerialize(validators) {|function extraDataSerialize(validators) {\n  // SORT_PATCHED\n  validators = validators.slice().sort((a,b) => a.consensusAddr.toLowerCase().localeCompare(b.consensusAddr.toLowerCase()));|' $VT
+        echo "patch_for_private_chain: validators.template now sorts by consensusAddr"
+    fi
 }
 
 # 4. Generate validator configurations, hardfork times, and the final genesis.json
@@ -369,8 +421,9 @@ prepare)
     echo "Preparing Docker cluster configs..."
     create_validator   # Step 1: Prepare keys and .local/
     prepare_bsc_client # Step 2: Build geth if necessary
-    reset_genesis      # Step 3: Setup genesis deps (Forge, Poetry, etc)
-    prepare_config     # Step 4: Generate genesis.json and node configs
+    reset_genesis              # Step 3: Setup genesis deps (Forge, Poetry, etc)
+    patch_for_private_chain    # Step 3b: Disable fast-finality for >4-validator chains (no-op if DISABLE_FAST_FINALITY=false)
+    prepare_config             # Step 4: Generate genesis.json and node configs
     initNetwork        # Step 5: Initialize Geth data directories
     patch_p2p_network  # Step 6: Patch 127.0.0.1 in configs to docker DNS
     generate_compose   # Step 7: Generate .env.cluster and docker-compose
