@@ -25,14 +25,21 @@ function create_validator() {
     done
 }
 
-# 2. Build bsc geth client from source if configured
+# 2. Build bsc geth client from source if configured.
+# BSC_GETH_BRANCH controls which branch to build (default: master).
+# Use "skip-execution" for the BNB-team fix for the >9-validator
+# fast-finality panic at consensus/parlia/snapshot.go:411
+# (https://github.com/bnb-chain/bsc/tree/skip-execution).
 function prepare_bsc_client() {
     if [ ${useLatestBscClient} = true ]; then
+        local BRANCH="${BSC_GETH_BRANCH:-master}"
         if [ ! -f "${workspace}/bsc/Makefile" ]; then
             cd ${workspace}
-            git clone https://github.com/bnb-chain/bsc.git
+            git clone --branch "${BRANCH}" https://github.com/bnb-chain/bsc.git
+        else
+            cd ${workspace}/bsc && git fetch origin && git checkout "${BRANCH}" && git pull origin "${BRANCH}"
         fi
-        cd ${workspace}/bsc && git pull && make geth && cp -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
+        cd ${workspace}/bsc && make geth && cp -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
     fi
 }
 
