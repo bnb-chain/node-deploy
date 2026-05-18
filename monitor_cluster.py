@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BSC Cluster Monitor
-Monitors the status of BSC nodes in the cluster
+SPC Cluster Monitor
+Monitors the status of SPC nodes in the cluster
 """
 
 import os
@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-class BSCClusterMonitor:
+class SPCClusterMonitor:
     def __init__(self, config_path: str):
         self.config = self.load_config(config_path)
 
@@ -54,7 +54,7 @@ class BSCClusterMonitor:
             raise
 
     def check_server_status(self, server_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Check status of BSC node on server"""
+        """Check status of SPC node on server"""
         server_name = server_config['name']
         server_host = server_config['host']
         http_port = server_config['ports']['http']
@@ -237,7 +237,7 @@ class BSCClusterMonitor:
     def print_status_report(self, cluster_status: Dict[str, Any]):
         """Print formatted status report"""
         print("\n" + "="*80)
-        print("BSC CLUSTER STATUS REPORT")
+        print("SPC CLUSTER STATUS REPORT")
         print("="*80)
         print(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cluster_status['timestamp']))}")
         print(f"Cluster Size: {cluster_status['cluster_size']}")
@@ -299,7 +299,7 @@ class BSCClusterMonitor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BSC Cluster Monitor")
+    parser = argparse.ArgumentParser(description="SPC Cluster Monitor")
     parser.add_argument("--config", default="deployment-config.yaml", help="Path to deployment config file")
     parser.add_argument("--continuous", action="store_true", help="Enable continuous monitoring")
     parser.add_argument("--interval", type=int, default=60, help="Monitoring interval in seconds")
@@ -315,7 +315,7 @@ def main():
         return 1
 
     try:
-        monitor = BSCClusterMonitor(args.config)
+        monitor = SPCClusterMonitor(args.config)
 
         if args.continuous:
             monitor.start_continuous_monitoring(args.interval)

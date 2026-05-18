@@ -55,7 +55,7 @@ function start() {
   --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
   --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
   --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-  > $dst/bsc-node.log 2>&1 &
+  > $dst/spc-node.log 2>&1 &
   echo $! > $dst/pid
 }
 
@@ -110,7 +110,7 @@ pruneblock)
     echo "===== end ===="
     ;;
 *)
-    echo "Usage: bsc_fullnode.sh start|stop|restart|clean nodeIndex syncmode"
-    echo "like: bsc_fullnode.sh start 1 snap, it will startup a snapsync node1"
+    echo "Usage: spc_fullnode.sh start|stop|restart|clean nodeIndex syncmode"
+    echo "like: spc_fullnode.sh start 1 snap, it will startup a snapsync node1"
     ;;
 esac

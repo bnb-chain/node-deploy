@@ -9,7 +9,7 @@ basedir=$(
 )
 workspace=${basedir}
 source ${workspace}/.env
-size=$((BSC_CLUSTER_SIZE))
+size=$((SPC_CLUSTER_SIZE))
 stateScheme="hash"
 dbEngine="leveldb"
 gcmode="full"
@@ -55,13 +55,13 @@ function create_validator() {
     done
 }
 
-function prepare_bsc_client() {
-    if [ ${useLatestBscClient} = true ]; then
-        if [ ! -f "${workspace}/bsc/Makefile" ]; then
+function prepare_spc_client() {
+    if [ ${useLatestSpcClient} = true ]; then
+        if [ ! -f "${workspace}/spc/Makefile" ]; then
             cd ${workspace}
-            git clone https://github.com/bnb-chain/bsc.git
+            git clone https://github.com/bnb-chain/spc.git
         fi
-        cd ${workspace}/bsc && git pull && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
+        cd ${workspace}/spc && git pull && make geth && mv -f ${workspace}/spc/build/bin/geth ${workspace}/bin/
     fi
 }
 # reset genesis, but keep edited genesis-template.json
@@ -137,8 +137,8 @@ function prepare_config() {
 
     cd ${workspace}/genesis/
     git checkout HEAD contracts
-    sed -i -e  's/alreadyInit = true;/turnLength = 16;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
-    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 300) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
+    sed -i -e  's/alreadyInit = true;/turnLength = 16;alreadyInit = true;/' ${workspace}/genesis/contracts/SPCValidatorSet.sol
+    sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 300) return;/' ${workspace}/genesis/contracts/SPCValidatorSet.sol
     
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
@@ -210,7 +210,7 @@ function initNetwork() {
         fi
     fi
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local --init.size=${size} --config ${workspace}/config.toml ${init_extra_args} ${workspace}/genesis/genesis.json
-    rm -f ${workspace}/*bsc.log*
+    rm -f ${workspace}/*spc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/node${i}/config.toml
         # init genesis
@@ -222,13 +222,13 @@ function initNetwork() {
         else
             ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
-        rm -f ${workspace}/.local/node${i}/*bsc.log*
+        rm -f ${workspace}/.local/node${i}/*spc.log*
 
         if [ ${EnableSentryNode} = true ]; then
             sed -i -e '/"<nil>"/d' ${workspace}/.local/sentry${i}/config.toml
             initLog=${workspace}/.local/sentry${i}/init.log
             ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-            rm -f ${workspace}/.local/sentry${i}/*bsc.log*
+            rm -f ${workspace}/.local/sentry${i}/*spc.log*
         fi
     done
     if [ ${EnableFullNode} = true ]; then
@@ -236,7 +236,7 @@ function initNetwork() {
         sed -i -e 's/EnableEVNFeatures = true/EnableEVNFeatures = false/g' ${workspace}/.local/fullnode0/config.toml
         initLog=${workspace}/.local/fullnode0/init.log
         ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        rm -f ${workspace}/.local/fullnode0/*bsc.log*
+        rm -f ${workspace}/.local/fullnode0/*spc.log*
     fi
 }
 
@@ -264,7 +264,7 @@ function native_start() {
         cp ${workspace}/bin/geth ${workspace}/.local/node${i}/geth${i}
         # update `config` in genesis.json
         # ${workspace}/.local/node${i}/geth${i} dumpgenesis --datadir ${workspace}/.local/node${i} | jq . > ${workspace}/.local/node${i}/genesis.json
-        # run BSC node
+        # run SPC node
         nohup  ${workspace}/.local/node${i}/geth${i} --config ${workspace}/.local/node${i}/config.toml \
             --mine --vote --password ${workspace}/.local/node${i}/password.txt --unlock ${cons_addr} --miner.etherbase ${cons_addr} --blspassword ${workspace}/.local/node${i}/password.txt \
             --datadir ${workspace}/.local/node${i} \
@@ -277,7 +277,7 @@ function native_start() {
             --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            >> ${workspace}/.local/node${i}/bsc-node.log 2>&1 &
+            >> ${workspace}/.local/node${i}/spc-node.log 2>&1 &
         
         if [ ${EnableSentryNode} = true ]; then
             cp ${workspace}/bin/geth ${workspace}/.local/sentry${i}/geth${i}
@@ -292,7 +292,7 @@ function native_start() {
                 --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${LastHardforkTime} \
                 --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
                 --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-                >> ${workspace}/.local/sentry${i}/bsc-node.log 2>&1 &
+                >> ${workspace}/.local/sentry${i}/spc-node.log 2>&1 &
         fi
     done
 
@@ -308,7 +308,7 @@ function native_start() {
             --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
             --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
             --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
-            >> ${workspace}/.local/fullnode0/bsc-node.log 2>&1 &
+            >> ${workspace}/.local/fullnode0/spc-node.log 2>&1 &
     fi
     sleep ${sleepAfterStart}
 }
@@ -331,7 +331,7 @@ case ${CMD} in
 reset)
     exit_previous
     create_validator
-    prepare_bsc_client
+    prepare_spc_client
     reset_genesis
     prepare_config
     initNetwork
@@ -354,6 +354,6 @@ regen-genesis)
     prepare_config
     ;;
 *)
-    echo "Usage: bsc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx] | regen-genesis"
+    echo "Usage: spc_cluster.sh | reset | stop [vidx]| start [vidx]| restart [vidx] | regen-genesis"
     ;;
 esac

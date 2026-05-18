@@ -64,9 +64,9 @@ class FileDistributor:
         logger.info("Generating genesis.json and config files...")
 
         try:
-            # Call bsc_cluster.sh to generate genesis
+            # Call spc_cluster.sh to generate genesis
             import subprocess
-            result = subprocess.run(["bash", "bsc_cluster.sh"], capture_output=True, text=True)
+            result = subprocess.run(["bash", "spc_cluster.sh"], capture_output=True, text=True)
             if result.returncode != 0:
                 logger.error(f"Failed to generate genesis: {result.stderr}")
                 return False
@@ -641,7 +641,7 @@ class FileDistributor:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BSC Node File Distributor")
+    parser = argparse.ArgumentParser(description="SPC Node File Distributor")
     parser.add_argument("--config", default="deployment-config.yaml", help="Path to deployment config file")
     parser.add_argument("--parallel", action="store_true", help="Enable parallel distribution")
     parser.add_argument("--max-parallel", type=int, default=5, help="Maximum parallel workers")

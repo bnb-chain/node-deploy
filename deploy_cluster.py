@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BSC Cluster Deployment Script
-Deploys BSC nodes to multiple servers using Docker
+SPC Cluster Deployment Script
+Deploys SPC nodes to multiple servers using Docker
 """
 
 import os
@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 
-class BSCClusterDeployer:
+class SPCClusterDeployer:
     def __init__(self, config_path: str):
         self.config = self.load_config(config_path)
         self.distributor = FileDistributor(config_path)
@@ -267,7 +267,7 @@ class BSCClusterDeployer:
                 deployment_script = f"""#!/bin/bash
 set -e
 
-echo "Starting BSC validator node deployment on {server_name}"
+echo "Starting SPC validator node deployment on {server_name}"
 
 # Stop existing container if running
 docker stop {server_name} 2>/dev/null || true
@@ -276,7 +276,7 @@ docker rm {server_name} 2>/dev/null || true
 # Run Docker container
 {docker_cmd}
 
-echo "BSC validator node deployment completed on {server_name}"
+echo "SPC validator node deployment completed on {server_name}"
 
 # Wait for node to be ready for staking
 echo "Waiting for node to be ready for staking..."
@@ -303,7 +303,7 @@ echo "Validator registration and staking completed"
                 deployment_script = f"""#!/bin/bash
 set -e
 
-echo "Starting BSC {role} node deployment on {server_name}"
+echo "Starting SPC {role} node deployment on {server_name}"
 
 # Stop existing container if running
 docker stop {server_name} 2>/dev/null || true
@@ -323,7 +323,7 @@ fi
 # Run Docker container
 {docker_cmd}
 
-echo "BSC {role} node deployment completed on {server_name}"
+echo "SPC {role} node deployment completed on {server_name}"
 """
 
             # Upload and execute deployment script
@@ -518,7 +518,7 @@ echo "BSC {role} node deployment completed on {server_name}"
             return True
 
         try:
-            # Check if BSC_CLUSTER_SIZE in .env matches cluster.size in deployment config
+            # Check if SPC_CLUSTER_SIZE in .env matches cluster.size in deployment config
             cluster_size = self.config['cluster']['size']
             env_file_path = ".env"
             
@@ -527,19 +527,19 @@ echo "BSC {role} node deployment completed on {server_name}"
                 with open(env_file_path, 'r') as f:
                     env_content = f.read()
                 
-                # Extract BSC_CLUSTER_SIZE from .env
+                # Extract SPC_CLUSTER_SIZE from .env
                 import re
-                match = re.search(r'BSC_CLUSTER_SIZE=(\d+)', env_content)
+                match = re.search(r'SPC_CLUSTER_SIZE=(\d+)', env_content)
                 if match:
                     env_cluster_size = int(match.group(1))
                     
                     # If they don't match, update .env file
                     if env_cluster_size != cluster_size:
-                        logger.info(f"Updating BSC_CLUSTER_SIZE in .env from {env_cluster_size} to {cluster_size}")
-                        # Replace the BSC_CLUSTER_SIZE line
+                        logger.info(f"Updating SPC_CLUSTER_SIZE in .env from {env_cluster_size} to {cluster_size}")
+                        # Replace the SPC_CLUSTER_SIZE line
                         env_content = re.sub(
-                            r'BSC_CLUSTER_SIZE=\d+', 
-                            f'BSC_CLUSTER_SIZE={cluster_size}', 
+                            r'SPC_CLUSTER_SIZE=\d+',
+                            f'SPC_CLUSTER_SIZE={cluster_size}',
                             env_content
                         )
                         
@@ -548,16 +548,16 @@ echo "BSC {role} node deployment completed on {server_name}"
                             f.write(env_content)
                         logger.info(".env file updated successfully")
                 else:
-                    logger.warning("BSC_CLUSTER_SIZE not found in .env file")
+                    logger.warning("SPC_CLUSTER_SIZE not found in .env file")
             else:
                 logger.warning(".env file not found")
 
             if regenerate_genesis:
                 logger.info("Regenerating genesis.json and base config...")
 
-                # Call bsc_cluster.sh to regenerate genesis
+                # Call spc_cluster.sh to regenerate genesis
                 import subprocess
-                script_path = "./bsc_cluster.sh"
+                script_path = "./spc_cluster.sh"
             if not os.path.exists(script_path):
                 print(f"ERROR: Script not found at {script_path}")
             else:
@@ -663,7 +663,7 @@ fi
         return status
 
     def check_server_status(self, server_config: Dict[str, Any]) -> Dict[str, str]:
-        """Check status of BSC node on server"""
+        """Check status of SPC node on server"""
         try:
             ssh_client = self.create_ssh_client(server_config)
             container_name = server_config['name']
@@ -697,8 +697,8 @@ fi
             }
 
     def deploy_cluster(self) -> bool:
-        """Deploy BSC cluster to all servers"""
-        logger.info("Starting BSC cluster deployment")
+        """Deploy SPC cluster to all servers"""
+        logger.info("Starting SPC cluster deployment")
 
         # Build Docker image
         if not self.config['options'].get('skip_build', False):
@@ -755,7 +755,7 @@ fi
 
 
 def main():
-    parser = argparse.ArgumentParser(description="BSC Cluster Deployer")
+    parser = argparse.ArgumentParser(description="SPC Cluster Deployer")
     parser.add_argument("--config", default="deployment-config.yaml", help="Path to deployment config file")
     parser.add_argument("--action", choices=['deploy', 'monitor', 'files', 'add-node'], default='deploy', help="Action to perform")
     parser.add_argument("--server-name", help="Server name (from deployment-config.yaml) for add-node action")
@@ -775,7 +775,7 @@ def main():
         return 1
 
     try:
-        deployer = BSCClusterDeployer(args.config)
+        deployer = SPCClusterDeployer(args.config)
 
         # Override config options with command line args
         if args.skip_build:

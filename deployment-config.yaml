@@ -1,4 +1,4 @@
-# BSC Cluster Deployment Configuration
+# SPC Cluster Deployment Configuration
 deployment:
   name: "simple-chain"
   version: "1.0.0"

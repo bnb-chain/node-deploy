@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  bsc-validator-1:
+  spc-validator-1:
     build: .
-    container_name: bsc-validator-1
+    container_name: spc-validator-1
     environment:
       - NODE_TYPE=validator
       - CONSENSUS_ADDRESS=0x${VALIDATOR_ADDRESS_1}
@@ -17,12 +17,12 @@ services:
       - "30303:30303"
       - "6060:6060"
     networks:
-      - bsc-network
+      - spc-network
     restart: unless-stopped
 
-  bsc-validator-2:
+  spc-validator-2:
     build: .
-    container_name: bsc-validator-2
+    container_name: spc-validator-2
     environment:
       - NODE_TYPE=validator
       - CONSENSUS_ADDRESS=0x${VALIDATOR_ADDRESS_2}
@@ -36,27 +36,27 @@ services:
       - "31303:30303"
       - "6160:6060"
     networks:
-      - bsc-network
+      - spc-network
     restart: unless-stopped
 
-  # bsc-fullnode:
+  # spc-fullnode:
   #   build: .
-  #   container_name: bsc-fullnode
+  #   container_name: spc-fullnode
   #   environment:
   #     - NODE_TYPE=fullnode
   #   volumes:
-  #     - ./deployment/fullnode:/home/bsc
-  #     - ./genesis/genesis.json:/home/bsc/genesis.json
-  #     - ./config.toml:/home/bsc/config.toml
+  #     - ./deployment/fullnode:/home/spc
+  #     - ./genesis/genesis.json:/home/spc/genesis.json
+  #     - ./config.toml:/home/spc/config.toml
   #   ports:
   #     - "8745:8545"
   #     - "8746:8546"
   #     - "32303:30303"
   #     - "6260:6060"
   #   networks:
-  #     - bsc-network
+  #     - spc-network
   #   restart: unless-stopped
 
 networks:
-  bsc-network:
+  spc-network:
     driver: bridge
