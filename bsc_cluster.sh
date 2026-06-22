@@ -216,9 +216,9 @@ function start_node() {
         --override.passedforktime ${PassedForkTime} \
         --override.lorentz ${PassedForkTime} \
         --override.maxwell ${PassedForkTime} \
-        --override.fermi ${LastHardforkTime} \
-        --override.osaka ${LastHardforkTime} \
-        --override.mendel ${LastHardforkTime} \
+        --override.fermi ${PassedForkTime} \
+        --override.osaka ${PassedForkTime} \
+        --override.mendel ${PassedForkTime} \
         --override.pasteur ${LastHardforkTime} \
         --override.immutabilitythreshold ${FullImmutabilityThreshold} \
         --override.breatheblockinterval ${BreatheBlockInterval} \
@@ -231,7 +231,7 @@ function start_node() {
 function native_start() {
     PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
-    rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "database=chaindata"|awk -F"=" '{print $NF}'|awk -F'"' '{print $1}'`
+    rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "Successfully wrote genesis state"|awk -F"hash=" '{print $NF}'|awk '{print $1}'`
 
     for ((i=0; i<size; i++)); do
         datadir="${workspace}/.local/node${i}"
