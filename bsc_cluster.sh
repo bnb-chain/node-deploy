@@ -16,13 +16,15 @@ gcmode="full"
 sleepBeforeStart=15
 sleepAfterStart=10
 
-# stop geth client
+# 1. Stop any previously running geth instances
 function exit_previous() {
     ValIdx=$1
-    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs kill
+    # if no geth exist just skip it
+    ps -ef  | grep geth$ValIdx | grep config |awk '{print $2}' | xargs -r kill
     sleep ${sleepBeforeStart}
 }
 
+# 2. Cleanup .local and copy initial keys for validators
 function create_validator() {
     rm -rf ${workspace}/.local
     mkdir -p ${workspace}/.local
@@ -33,6 +35,7 @@ function create_validator() {
     done
 }
 
+# 3. Build bsc geth client from source if configured
 function prepare_bsc_client() {
     if [ ${useLatestBscClient} = true ]; then
         if [ ! -f "${workspace}/bsc/Makefile" ]; then
@@ -42,13 +45,20 @@ function prepare_bsc_client() {
         cd ${workspace}/bsc && git pull && make geth && mv -f ${workspace}/bsc/build/bin/geth ${workspace}/bin/
     fi
 }
-# reset genesis, but keep edited genesis-template.json
+
+# 4. Reset genesis submodule and install dependencies (Poetry, NPM, Forge)
+# This prepares the environment for generating the genesis block
 function reset_genesis() {
     if [ ! -f "${workspace}/genesis/genesis-template.json" ]; then
         cd ${workspace} && git submodule update --init --recursive genesis
         cd ${workspace}/genesis && git reset --hard ${GENESIS_COMMIT}
     fi
     cd ${workspace}/genesis
+
+    # 1. Update the 'genesis' submodule safely
+    # Backup user templates, force-update the repository to a specific 
+    # compatible version ($GENESIS_COMMIT) to prevent breaking changes, 
+    # and then restore the user templates.
     cp genesis-template.json genesis-template.json.bk
     cp scripts/init_holders.template scripts/init_holders.template.bk
     git stash
@@ -57,8 +67,11 @@ function reset_genesis() {
     mv genesis-template.json.bk genesis-template.json
     mv scripts/init_holders.template.bk scripts/init_holders.template
 
+    # 2. Install project-specific dependencies
     poetry install --no-root
     npm install
+    
+    # 3. Clean up and reinstall Foundry framework components (Standard Library & Tests)
     rm -rf lib/forge-std
     forge install --no-git foundry-rs/forge-std@v1.7.3
     cd lib/forge-std/lib
@@ -66,13 +79,17 @@ function reset_genesis() {
     git clone https://github.com/dapphub/ds-test
 }
 
+# 5. Generate validator configurations, hardfork times, and the final genesis.json
 function prepare_config() {
     rm -f ${workspace}/genesis/validators.conf
 
     passedHardforkTime=$(expr $(date +%s) + ${PASSED_FORK_DELAY})
     echo "passedHardforkTime "${passedHardforkTime} > ${workspace}/.local/hardforkTime.txt
     initHolders=${INIT_HOLDER}
+
+    # 1. Collect Validator Information & Setup Node Directories
     for ((i = 0; i < size; i++)); do
+        # read their randomly generated cryptographic key files (Consensus addresses and BLS vote keys)
         for f in ${workspace}/.local/validator${i}/keystore/*; do
             cons_addr="0x$(cat ${f} | jq -r .address)"
             initHolders=${initHolders}","${cons_addr}
@@ -84,11 +101,15 @@ function prepare_config() {
         cp ${workspace}/keys/password.txt ./
         cp ${workspace}/.local/hardforkTime.txt ./
         bbcfee_addrs=${fee_addr}
+        # It assigns a massive, hardcoded amount of "voting power" (0x000001d1a94a2000) so the node has the authority to forge blocks.
         powers="0x000001d1a94a2000" #2000000000000
         mv ${workspace}/.local/bls${i}/bls ./ && rm -rf ${workspace}/.local/bls${i}
         vote_addr=0x$(cat ./bls/keystore/*json | jq .pubkey | sed 's/"//g')
+        # it writes all these unique peices: the consensus address, fee collection address, voting power, and BLS vote address
         echo "${cons_addr},${bbcfee_addrs},${fee_addr},${powers},${vote_addr}" >> ${workspace}/genesis/validators.conf
         if [ ${EnableSentryNode} = true ]; then
+            # Sentry nodes act as a protective firewall/proxy for Validators, 
+            # hiding the Validator's real IP address from public P2P network attacks.
             mkdir -p ${workspace}/.local/sentry${i}
         fi
     done
@@ -97,11 +118,15 @@ function prepare_config() {
     fi
     rm -f ${workspace}/.local/hardforkTime.txt
 
+    # 2. Hack / Patch the System Smart Contracts
     cd ${workspace}/genesis/
     git checkout HEAD contracts
+    # "hack" the source code of the core BSCValidatorSet.sol smart contract right before compiling. 
+    # They lower the turnLength and explicitly tell the system to ignore validator punishments/updates for the first 2,000 blocks to ensure your local network starts smoothly without validators instantly getting jailed.
     sed -i -e  's/alreadyInit = true;/turnLength = 16;alreadyInit = true;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     sed -i -e  's/public onlyCoinbase onlyZeroGasPrice {/public onlyCoinbase onlyZeroGasPrice {if (block.number < 2000) return;/' ${workspace}/genesis/contracts/BSCValidatorSet.sol
     
+    # 3. Generate the Final Genesis Block
     poetry run python -m scripts.generate generate-validators
     poetry run python -m scripts.generate generate-init-holders "${initHolders}"
     poetry run python -m scripts.generate dev \
@@ -124,8 +149,10 @@ function prepare_config() {
     cp genesis-dev.json genesis.json
 }
 
+# 6. Initialize the geth network for each node using the generated genesis.json
 function initNetwork() {
     cd ${workspace}
+    # 1. Assigning P2P Identities
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/node${i}/geth
         cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/node${i}/geth/nodekey
@@ -140,6 +167,7 @@ function initNetwork() {
         cp ${workspace}/keys/fullnode-nodekey0 ${workspace}/.local/fullnode0/geth/nodekey
     fi
     
+    # 2. Preparing Network Arguments
     init_extra_args=""
     if [ ${EnableSentryNode} = true ]; then
         init_extra_args="--init.sentrynode-size ${size} --init.sentrynode-ports 30411"
@@ -161,23 +189,23 @@ function initNetwork() {
             init_extra_args="${init_extra_args} --init.evn-validator-whitelist"
         fi
     fi
+
+    # 3. Generating Network Configs (config.toml)
     ${workspace}/bin/geth init-network --init.dir ${workspace}/.local --init.size=${size} --config ${workspace}/config.toml ${init_extra_args} ${workspace}/genesis/genesis.json
     rm -f ${workspace}/*bsc.log*
+
+    # 4. Initializing the Blockchain Database (geth init)
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/node${i}/config.toml
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
-        if  [ $i -eq 0 ] ; then
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        else
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
-        fi
+        ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/node${i}/*bsc.log*
 
         if [ ${EnableSentryNode} = true ]; then
             sed -i -e '/"<nil>"/d' ${workspace}/.local/sentry${i}/config.toml
             initLog=${workspace}/.local/sentry${i}/init.log
-            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
             rm -f ${workspace}/.local/sentry${i}/*bsc.log*
         fi
     done
@@ -185,7 +213,7 @@ function initNetwork() {
         sed -i -e '/"<nil>"/d' ${workspace}/.local/fullnode0/config.toml
         sed -i -e 's/EnableEVNFeatures = true/EnableEVNFeatures = false/g' ${workspace}/.local/fullnode0/config.toml
         initLog=${workspace}/.local/fullnode0/init.log
-        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/fullnode0/*bsc.log*
     fi
 }
@@ -206,11 +234,12 @@ function start_node() {
     nohup ${geth_bin} --config ${datadir}/config.toml \
         --datadir ${datadir} \
         --nodekey ${datadir}/geth/nodekey \
+        --cache 512 \
         --rpc.allow-unprotected-txs --allow-insecure-unlock \
         --ws --ws.addr 0.0.0.0 --ws.port ${ws_port} \
         --http --http.addr 0.0.0.0 --http.port ${http_port} --http.corsdomain "*" \
-        --metrics --metrics.addr localhost --metrics.port ${metrics_port} \
-        --pprof --pprof.addr localhost --pprof.port ${pprof_port} \
+        --metrics --metrics.addr 0.0.0.0 --metrics.port ${metrics_port} \
+        --pprof --pprof.addr 0.0.0.0 --pprof.port ${pprof_port} \
         --gcmode ${gcmode} --syncmode full --monitor.maliciousvote \
         --rialtohash ${rialtoHash} \
         --override.passedforktime ${PassedForkTime} \
@@ -228,11 +257,13 @@ function start_node() {
         >> ${datadir}/bsc-node.log 2>&1 &
 }
 
+# 7. Start the nodes (Validators, Sentry, Full) in the background
 function native_start() {
     PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
     LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
     rialtoHash=`cat ${workspace}/.local/node0/init.log|grep "Successfully wrote genesis state"|awk -F"hash=" '{print $NF}'|awk '{print $1}'`
 
+    # Starting Validator Nodes
     for ((i=0; i<size; i++)); do
         datadir="${workspace}/.local/node${i}"
 
@@ -244,6 +275,8 @@ function native_start() {
         # get validator address
         cons_addr="0x$(jq -r .address ${datadir}/keystore/*)"
 
+        # Copying Geth binaries to unique names (geth0, geth1...) 
+        # for easier node-specific monitoring in htop.
         cp ${workspace}/bin/geth ${datadir}/geth${i}
 
         base=$((8545 + i*2))
@@ -251,6 +284,7 @@ function native_start() {
             $base $base $((6060+i*2)) $((7060+i*2))
     done
 
+    # Starting Sentry Nodes
     if [ ${EnableSentryNode} = true ]; then
         sleep 10
         for ((i=0; i<size; i++)); do
@@ -274,27 +308,30 @@ function native_start() {
     sleep ${sleepAfterStart}
 }
 
+# 8. Use create-validator tool to register validator nodes on StakeHub
 function register_stakehub(){
     # wait feynman enable
     sleep 45
     for ((i = 0; i < size; i++));do
-        ${workspace}/create-validator/create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
+        create-validator --consensus-key-dir ${workspace}/keys/validator${i} --vote-key-dir ${workspace}/keys/bls${i} \
             --password-path ${workspace}/keys/password.txt --amount 20001 --validator-desc Val${i} --rpc-url ${RPC_URL}
     done
 }
 
+# Command dispatcher
 CMD=$1
 ValidatorIdx=$2
 case ${CMD} in
 reset)
-    exit_previous
-    create_validator
-    prepare_bsc_client
-    reset_genesis
-    prepare_config
-    initNetwork
-    native_start
-    register_stakehub
+    # The 'reset' flow perform a clean initialization of the entire local cluster:
+    exit_previous      # Step 1: Kill old processes
+    create_validator   # Step 2: Prepare keys and .local/
+    prepare_bsc_client # Step 3: Build geth if necessary
+    reset_genesis      # Step 4: Setup genesis deps (Forge, Poetry, etc)
+    prepare_config     # Step 5: Generate genesis.json and node configs
+    initNetwork        # Step 6: Initialize Geth data directories
+    native_start       # Step 7: Start the cluster nodes
+    register_stakehub  # Step 8: Register validators with the network
     ;;
 stop)
     exit_previous $ValidatorIdx
