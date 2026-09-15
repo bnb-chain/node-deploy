@@ -39,7 +39,7 @@ function startChaind() {
         --history.logs.disable \
         --cache 10480 \
         --rialtohash ${rialtoHash} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} \
-        --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${LastHardforkTime} \
+        --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} \
         --override.immutabilitythreshold ${FullImmutabilityThreshold} --override.breatheblockinterval ${BreatheBlockInterval} \
         --override.minforblobrequest ${MinBlocksForBlobRequests} --override.defaultextrareserve ${DefaultExtraReserveForBlobRequests} \
         >> /mnt/efs/${workdir}/${ip}/bscnode.log 2>&1
