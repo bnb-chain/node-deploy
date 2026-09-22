@@ -22,13 +22,38 @@ DelayLeftOver = 20000000
 Enabled = true
 GreedyMergeTx = true
 BuilderFeeCeil= "0"
+SentryURL = ""
 ValidatorCommission = 1000
 BidSimulationLeftOver = 30000000
 NoInterruptLeftOver = 170000000
 MaxBidsPerBuilder = 2
 
 [[Eth.Miner.Mev.Builders]]
-Address = "0xf7698afa5461438ff438c2322d6d29a5f7abdffd"
+Address = "0x9C26C7ea433374c0b1B3fADdAB4E571DEB7937dc"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0xfB13BDdeEd79aB1aB0C99a51684c7adAe48e029C"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x289cB482a981517ad399e70B7908906155c8C977"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x484FF41E0E275Dc8569e337F912a8A390660Fe7E"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x6aDB8CFd9B292a897B8926D1fD9C68E0d384972D"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x27c3c5634bD0F4472f360084bE673FA573f3CE64"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x83E08b8509Bb5d8e3A15b33c9a7CBe75Fbee2005"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0xEbeEEeA4D53045EbC35E49d20DadeaB5275aecC7"
+
+[[Eth.Miner.Mev.Builders]]
+Address = "0x51b22803Be337D32da2C17B6E3f5B028BDC41e47"
 
 [Eth.TxPool]
 Locals = []

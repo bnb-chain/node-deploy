@@ -189,6 +189,19 @@ function initNetwork() {
     rm -f ${workspace}/*bsc.log*
     for ((i = 0; i < size; i++)); do
         sed -i -e '/"<nil>"/d' ${workspace}/.local/node${i}/config.toml
+        local node_config="${workspace}/.local/node${i}/config.toml"
+        local private_ip="${validator_ips[i]}"
+        # Use the public IP when configured, otherwise use the private IP.
+        local sentry_ip="${ips2publicips[$private_ip]:-${private_ip}}"
+
+        if ! grep -q '^SentryURL[[:space:]]*=' "${node_config}"; then
+            echo "Error: missing SentryURL in ${node_config}" >&2
+            exit 1
+        fi
+        sed -i -e \
+            "s|^SentryURL[[:space:]]*=.*|SentryURL = \"http://${sentry_ip}:8546\"|" \
+            "${node_config}"
+
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
