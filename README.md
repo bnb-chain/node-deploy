@@ -3,6 +3,10 @@
 
 ## Installation
 Before proceeding to the next steps, please ensure that the following packages and softwares are well installed in your local machine: 
+
+> [!TIP]
+> **Don't want to install these manually?** You can skip to the [Docker Version](#docker-version-recommended) section at the bottom of this file.
+
 - nodejs: v16.15.0
 - npm: 6.14.6
 - go: 1.24+
@@ -88,3 +92,82 @@ cd txblob
 go build
 ./txblob
 ```
+
+## Docker Version (Recommended)
+
+To run a fully containerized, isolated local BSC cluster without installing dependencies on your host machine, use the provided `Makefile` which handles the 2-phase orchestration automatically.
+
+### Architecture Workflow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Makefile
+    participant Toolbox as Toolbox (Docker)
+    participant HostFS as Host FileSystem
+    participant Compose as Docker Compose
+    participant Docker as Docker Engine
+
+    User->>Makefile: make cluster-up
+
+    Note over Makefile,Toolbox: Phase 1: Initialization (prepare)
+    Makefile->>Toolbox: Start disposable 'bsc-toolbox' container and execute script
+
+    Toolbox->>HostFS: Compile and save 'geth' binary
+    Toolbox->>HostFS: Generate genesis, keystores, config.toml (.local/)
+    Toolbox->>HostFS: Generate .env.cluster (cluster params, node count)
+    Toolbox->>HostFS: Generate docker-compose.cluster.yml (based on env)
+
+    Toolbox-->>Makefile: Exit (container removed)
+
+    Note over Makefile,Compose: Phase 2: Start Cluster (up)
+    Makefile->>Compose: docker compose -f docker-compose.cluster.yml up -d
+
+    Compose->>HostFS: Read docker-compose.cluster.yml
+    Compose->>HostFS: Load .env.cluster (env injection)
+
+    Compose->>Docker: Create & start N bsc-node-X containers
+
+    Docker->>HostFS: Mount volumes (./ -> /node_deploy)
+
+    Docker->>Docker: Run node_entrypoint.sh inside each container
+    Docker->>HostFS: Containers read config.toml / genesis / keystore
+
+    Docker-->>User: Cluster running (N nodes)
+
+    Note over Makefile,Toolbox: Phase 3: Validator Registration (register)
+    Makefile->>Makefile: Wait for RPC (localhost:8545 ready)
+    Makefile->>Toolbox: Start new Toolbox container inside 'bsc_cluster_network'
+    Toolbox->>HostFS: Load .env (get RPC_URL)
+    Toolbox->>Docker: Send 'Register' Transactions (via RPC to Node 0)
+    Toolbox-->>Makefile: Exit (registration tasks submitted)
+
+    Note over User,Docker: Local BSC Cluster active with registered validators
+```
+
+### Quick Commands
+
+- **`make cluster-up`**: One-click start. It runs the initialization phase, starts the isolated nodes via Docker Compose, and then automatically handles validator registration on StakeHub.
+- **`make cluster-down`**: Safely stop all running nodes.
+- **`make cluster-logs`**: Stream aggregated, color-coded logs from all running nodes.
+- **`make cluster-restart`**: Fast restart the cluster (nodes only). Use this if you manually modified `.local/nodeX/config.toml` and want to apply changes without wiping the blockchain data.
+- **`make cluster-clean`**: **WARNING**. Wipes all generated data (`.local/`), genesis files, and temporary yaml configs. Use this to reset the chain back to block zero.
+
+### Node Ports Mapping
+
+Each node runs identically on port `8545` internally. Host mapping is structured sequentially:
+
+| Node | RPC (HTTP/WS) | Metrics (Prometheus) | pprof (Debug) | P2P (TCP/UDP) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Node 0** | 8545 | 6060 | 7060 | 30311 |
+| **Node 1** | 8547 | 6062 | 7062 | 30312 |
+| **Node 2** | 8549 | 6064 | 7064 | 30313 |
+| **Node 3** | 8551 | 6066 | 7066 | 30314 |
+
+For example, to check the block height of Node 1:
+`curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://127.0.0.1:8547`
+
+### Logging
+
+By default, nodes output all their logs directly to the Docker logging driver (STDOUT). You can view them using:
+`docker logs -f bsc-node-0`

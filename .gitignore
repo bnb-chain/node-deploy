@@ -9,3 +9,6 @@
 
 .idea/
 lib/
+bsc/
+docker-compose.cluster.yml
+.env.cluster
