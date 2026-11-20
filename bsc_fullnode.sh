@@ -43,7 +43,7 @@ mkdir -pv $dst/
 
 function init() {
   cp $src/config.toml $dst/ && cp $src/genesis.json $dst/
-  ${workspace}/bin/geth init --state.scheme ${stateScheme} --datadir ${dst}/ ${dst}/genesis.json
+  ${workspace}/bin/geth init --state.scheme ${stateScheme} --datadir ${dst}/ --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} ${dst}/genesis.json
 }
 
 function start() {
