@@ -126,6 +126,8 @@ function prepare_config() {
 
 function initNetwork() {
     cd ${workspace}
+    PassedForkTime=`cat ${workspace}/.local/node0/hardforkTime.txt|grep passedHardforkTime|awk -F" " '{print $NF}'`
+    LastHardforkTime=$(expr ${PassedForkTime} + ${LAST_FORK_MORE_DELAY})
     for ((i = 0; i < size; i++)); do
         mkdir ${workspace}/.local/node${i}/geth
         cp ${workspace}/keys/validator-nodekey${i} ${workspace}/.local/node${i}/geth/nodekey
@@ -168,16 +170,16 @@ function initNetwork() {
         # init genesis
         initLog=${workspace}/.local/node${i}/init.log
         if  [ $i -eq 0 ] ; then
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme ${stateScheme} --db.engine ${dbEngine} --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         else
-            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/node${i} init --state.scheme path --db.engine pebble --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         fi
         rm -f ${workspace}/.local/node${i}/*bsc.log*
 
         if [ ${EnableSentryNode} = true ]; then
             sed -i -e '/"<nil>"/d' ${workspace}/.local/sentry${i}/config.toml
             initLog=${workspace}/.local/sentry${i}/init.log
-            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+            ${workspace}/bin/geth --datadir ${workspace}/.local/sentry${i} init --state.scheme path --db.engine pebble --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
             rm -f ${workspace}/.local/sentry${i}/*bsc.log*
         fi
     done
@@ -185,7 +187,7 @@ function initNetwork() {
         sed -i -e '/"<nil>"/d' ${workspace}/.local/fullnode0/config.toml
         sed -i -e 's/EnableEVNFeatures = true/EnableEVNFeatures = false/g' ${workspace}/.local/fullnode0/config.toml
         initLog=${workspace}/.local/fullnode0/init.log
-        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
+        ${workspace}/bin/geth --datadir ${workspace}/.local/fullnode0 init --state.scheme path --db.engine pebble --override.passedforktime ${PassedForkTime} --override.lorentz ${PassedForkTime} --override.maxwell ${PassedForkTime} --override.fermi ${PassedForkTime} --override.osaka ${PassedForkTime} --override.mendel ${PassedForkTime} --override.pasteur ${PassedForkTime} --override.jenner ${LastHardforkTime} ${workspace}/genesis/genesis.json  > "${initLog}" 2>&1
         rm -f ${workspace}/.local/fullnode0/*bsc.log*
     fi
 }
